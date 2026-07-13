@@ -1,8 +1,7 @@
 import React from 'react';
 import { useApp } from '@/context/AppContext';
 import StatusBadge from '@/components/StatusBadge';
-import { ROOMS } from '@/lib/constants';
-import { formatDate, formatSlot } from '@/lib/format';
+import { formatDate } from '@/lib/format';
 import { X } from 'lucide-react';
 
 function Section({ title, children, empty }) {
@@ -17,14 +16,32 @@ function Section({ title, children, empty }) {
 }
 
 export default function TransactionsTab() {
-  const { session, reservations, cancelReservation } = useApp();
-  const mine = reservations.filter((r) => r.student === session.userId);
-  const bookRes = mine.filter((r) => r.type === 'book');
-  const roomRes = mine.filter((r) => r.type === 'room');
-  const roomName = (id) => ROOMS.find((r) => r.id === id)?.name || id;
+  const { session, reservations, cancelReservation, cancelRoomBooking } = useApp();
 
-  const CancelBtn = ({ id }) => (
-    <button onClick={() => cancelReservation(id)} className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-ub-red px-2.5 py-1 rounded-lg hover:bg-red-50 cursor-pointer">
+  // Book reservations — from 'reservations' table (no type field, has book_id)
+  const bookRes = reservations.filter(
+    (r) => r.type !== 'room' && r.user_id === session.userDbId
+  );
+
+  // Room bookings — from 'room_bookings' table (type === 'room')
+  const roomRes = reservations.filter(
+    (r) => r.type === 'room' && r.user_id === session.userDbId
+  );
+
+  const CancelBookBtn = ({ id }) => (
+    <button
+      onClick={() => cancelReservation(id)}
+      className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-ub-red px-2.5 py-1 rounded-lg hover:bg-red-50 cursor-pointer"
+    >
+      <X size={12} /> Cancel
+    </button>
+  );
+
+  const CancelRoomBtn = ({ id }) => (
+    <button
+      onClick={() => cancelRoomBooking(id)}
+      className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-ub-red px-2.5 py-1 rounded-lg hover:bg-red-50 cursor-pointer"
+    >
       <X size={12} /> Cancel
     </button>
   );
@@ -36,7 +53,8 @@ export default function TransactionsTab() {
         <p className="text-ub-gray mt-1">Track and manage your book and room requests.</p>
       </div>
 
-      <Section title="Books" empty={bookRes.length === 0 ? 'No book reservations.' : null}>
+      {/* Book Reservations */}
+      <Section title="Books" empty={bookRes.length === 0 ? 'No book reservations yet.' : null}>
         {bookRes.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -51,11 +69,16 @@ export default function TransactionsTab() {
               <tbody className="divide-y divide-gray-100">
                 {bookRes.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50/60">
-                    <td className="px-5 py-3 font-medium text-gray-900">{r.detail}</td>
+                    <td className="px-5 py-3 font-medium text-gray-900">
+                      {r.books?.title || '—'}
+                    </td>
                     <td className="px-5 py-3 text-ub-gray">{formatDate(r.date)}</td>
                     <td className="px-5 py-3"><StatusBadge status={r.status} /></td>
                     <td className="px-5 py-3 text-right">
-                      {r.status === 'pending' ? <CancelBtn id={r.id} /> : <span className="text-xs text-ub-gray">—</span>}
+                      {r.status === 'pending'
+                        ? <CancelBookBtn id={r.id} />
+                        : <span className="text-xs text-ub-gray">—</span>
+                      }
                     </td>
                   </tr>
                 ))}
@@ -65,14 +88,16 @@ export default function TransactionsTab() {
         )}
       </Section>
 
-      <Section title="Rooms" empty={roomRes.length === 0 ? 'No room bookings.' : null}>
+      {/* Room Bookings */}
+      <Section title="Rooms" empty={roomRes.length === 0 ? 'No room bookings yet.' : null}>
         {roomRes.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-ub-gray text-xs uppercase">
                 <tr>
                   <th className="text-left px-5 py-3 font-semibold">Room</th>
-                  <th className="text-left px-5 py-3 font-semibold">Date &amp; Time</th>
+                  <th className="text-left px-5 py-3 font-semibold">Date</th>
+                  <th className="text-left px-5 py-3 font-semibold">Time</th>
                   <th className="text-left px-5 py-3 font-semibold">Status</th>
                   <th className="text-right px-5 py-3 font-semibold">Action</th>
                 </tr>
@@ -80,11 +105,17 @@ export default function TransactionsTab() {
               <tbody className="divide-y divide-gray-100">
                 {roomRes.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50/60">
-                    <td className="px-5 py-3 font-medium text-gray-900">{roomName(r.roomId)}</td>
-                    <td className="px-5 py-3 text-ub-gray">{formatSlot(r.roomSlot)}</td>
+                    <td className="px-5 py-3 font-medium text-gray-900">
+                      {r.rooms?.name || r.room_id}
+                    </td>
+                    <td className="px-5 py-3 text-ub-gray">{formatDate(r.date)}</td>
+                    <td className="px-5 py-3 text-ub-gray">{r.time_slot}</td>
                     <td className="px-5 py-3"><StatusBadge status={r.status} /></td>
                     <td className="px-5 py-3 text-right">
-                      {r.status === 'pending' ? <CancelBtn id={r.id} /> : <span className="text-xs text-ub-gray">—</span>}
+                      {r.status === 'pending'
+                        ? <CancelRoomBtn id={r.id} />
+                        : <span className="text-xs text-ub-gray">—</span>
+                      }
                     </td>
                   </tr>
                 ))}

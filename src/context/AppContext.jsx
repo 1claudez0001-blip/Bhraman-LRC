@@ -1,74 +1,221 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
-import { INITIAL_BOOKS, DEMO_CREDENTIALS } from '@/lib/constants';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 
 const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
-  const [books, setBooks] = useLocalStorage('ublib_books', INITIAL_BOOKS);
-  const [reservations, setReservations] = useLocalStorage('ublib_reservations', []);
-  const [nextReservationId, setNextReservationId] = useLocalStorage('ublib_reservationId', 1);
-  const [nextBookId, setNextBookId] = useLocalStorage('ublib_nextBookId', 9);
-
   const [session, setSession] = useState(() => {
     try {
       const raw = sessionStorage.getItem('ublib_session');
-      return raw ? JSON.parse(raw) : { userType: null, userName: null, userId: null };
+      return raw ? JSON.parse(raw) : { userType: null, userName: null, userId: null, userDbId: null };
     } catch {
-      return { userType: null, userName: null, userId: null };
+      return { userType: null, userName: null, userId: null, userDbId: null };
     }
   });
 
-  const login = useCallback((userType, username, password) => {
-    const creds = DEMO_CREDENTIALS[userType];
-    if (creds && creds.username === username && creds.password === password) {
-      const newSession = { userType, userName: creds.name, userId: creds.userId };
-      sessionStorage.setItem('ublib_session', JSON.stringify(newSession));
-      setSession(newSession);
-      return { success: true };
+  const [books, setBooks] = useState([]);
+  const [reservations, setReservations] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // ─── Fetch books from Supabase ───────────────────────────────────────────
+  const fetchBooks = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('books')
+      .select('*')
+      .order('title');
+    if (!error) setBooks(data || []);
+  }, []);
+
+  // ─── Fetch reservations from Supabase ────────────────────────────────────
+  const fetchReservations = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('reservations')
+      .select('*, books(title, author), users(name, student_id)')
+      .order('created_at', { ascending: false });
+    if (!error) setReservations(data || []);
+  }, []);
+
+  const fetchRoomBookings = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('room_bookings')
+      .select('*, rooms(name, capacity), users(name, student_id)')
+      .order('created_at', { ascending: false });
+    if (!error) setReservations(prev => {
+      // Merge room bookings into reservations array with a type flag
+      const bookOnly = prev.filter(r => r.type !== 'room');
+      const withType = (data || []).map(r => ({ ...r, type: 'room' }));
+      return [...bookOnly, ...withType];
+    });
+  }, []);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      await fetchBooks();
+      await fetchReservations();
+      await fetchRoomBookings();
+      setLoading(false);
+    };
+    load();
+  }, [fetchBooks, fetchReservations, fetchRoomBookings]);
+
+  // ─── AUTH ────────────────────────────────────────────────────────────────
+  const login = useCallback(async (userType, studentId, password) => {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('student_id', studentId)
+      .eq('password', password)
+      .eq('role', userType)
+      .single();
+
+    if (error || !data) {
+      return { success: false, error: 'Invalid ID or password' };
     }
-    return { success: false, error: 'Invalid username or password' };
+
+    const newSession = {
+      userType: data.role,
+      userName: data.name,
+      userId: data.student_id,
+      userDbId: data.id,
+    };
+    sessionStorage.setItem('ublib_session', JSON.stringify(newSession));
+    setSession(newSession);
+    return { success: true };
   }, []);
 
   const logout = useCallback(() => {
     sessionStorage.removeItem('ublib_session');
-    setSession({ userType: null, userName: null, userId: null });
+    setSession({ userType: null, userName: null, userId: null, userDbId: null });
   }, []);
 
-  const addBook = useCallback((book) => {
-    const newBook = { ...book, id: nextBookId };
-    setBooks((prev) => [...prev, newBook]);
-    setNextBookId((n) => n + 1);
-    return newBook;
-  }, [nextBookId, setBooks, setNextBookId]);
+  // ─── BOOKS CRUD ──────────────────────────────────────────────────────────
+  const addBook = useCallback(async (book) => {
+    const { data, error } = await supabase
+      .from('books')
+      .insert([{ ...book, total_copies: 1, available_copies: 1 }])
+      .select()
+      .single();
+    if (!error) await fetchBooks();
+    return { data, error };
+  }, [fetchBooks]);
 
-  const updateBook = useCallback((id, updates) => {
-    setBooks((prev) => prev.map((b) => (b.id === id ? { ...b, ...updates } : b)));
-  }, [setBooks]);
+  const updateBook = useCallback(async (id, updates) => {
+    const { error } = await supabase
+      .from('books')
+      .update(updates)
+      .eq('id', id);
+    if (!error) await fetchBooks();
+    return { error };
+  }, [fetchBooks]);
 
-  const deleteBook = useCallback((id) => {
-    setBooks((prev) => prev.filter((b) => b.id !== id));
-  }, [setBooks]);
+  const deleteBook = useCallback(async (id) => {
+    const { error } = await supabase
+      .from('books')
+      .delete()
+      .eq('id', id);
+    if (!error) await fetchBooks();
+    return { error };
+  }, [fetchBooks]);
 
-  const addReservation = useCallback((reservation) => {
-    const newRes = { ...reservation, id: nextReservationId };
-    setReservations((prev) => [newRes, ...prev]);
-    setNextReservationId((n) => n + 1);
-    return newRes;
-  }, [nextReservationId, setReservations, setNextReservationId]);
+  // ─── BOOK RESERVATIONS ───────────────────────────────────────────────────
+  const addReservation = useCallback(async (reservation) => {
+    const { data, error } = await supabase
+      .from('reservations')
+      .insert([{
+        user_id: session.userDbId,
+        book_id: reservation.bookId,
+        status: 'pending',
+        purpose: reservation.borrowingPurpose,
+        photo_url: reservation.studentPhoto,
+        date: new Date().toISOString().slice(0, 10),
+      }])
+      .select()
+      .single();
 
-  const updateReservationStatus = useCallback((id, status) => {
-    setReservations((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
-  }, [setReservations]);
+    if (!error) {
+      await fetchReservations();
+    }
+    return { data, error };
+  }, [session.userDbId, fetchReservations]);
 
-  const cancelReservation = useCallback((id) => {
-    setReservations((prev) => prev.filter((r) => r.id !== id));
-  }, [setReservations]);
+  const updateReservationStatus = useCallback(async (id, status) => {
+    const { error } = await supabase
+      .from('reservations')
+      .update({ status })
+      .eq('id', id);
+
+    // If approved, decrement available_copies
+    if (!error && status === 'approved') {
+      const res = reservations.find(r => r.id === id && r.type !== 'room');
+      if (res?.book_id) {
+        await supabase.rpc('decrement_available_copies', { book_id: res.book_id });
+      }
+    }
+    // If returned, increment available_copies
+    if (!error && status === 'returned') {
+      const res = reservations.find(r => r.id === id && r.type !== 'room');
+      if (res?.book_id) {
+        await supabase.rpc('increment_available_copies', { book_id: res.book_id });
+      }
+    }
+
+    await fetchReservations();
+    return { error };
+  }, [reservations, fetchReservations]);
+
+  const cancelReservation = useCallback(async (id) => {
+    const { error } = await supabase
+      .from('reservations')
+      .delete()
+      .eq('id', id);
+    if (!error) await fetchReservations();
+    return { error };
+  }, [fetchReservations]);
+
+  // ─── ROOM BOOKINGS ───────────────────────────────────────────────────────
+  const addRoomBooking = useCallback(async (booking) => {
+    const { data, error } = await supabase
+      .from('room_bookings')
+      .insert([{
+        user_id: session.userDbId,
+        room_id: booking.roomId,
+        date: booking.date,
+        time_slot: booking.timeSlot,
+        status: 'pending',
+        purpose: booking.purpose,
+        photo_url: booking.photo,
+      }])
+      .select()
+      .single();
+
+    if (!error) await fetchRoomBookings();
+    return { data, error };
+  }, [session.userDbId, fetchRoomBookings]);
+
+  const updateRoomBookingStatus = useCallback(async (id, status) => {
+    const { error } = await supabase
+      .from('room_bookings')
+      .update({ status })
+      .eq('id', id);
+    if (!error) await fetchRoomBookings();
+    return { error };
+  }, [fetchRoomBookings]);
+
+  const cancelRoomBooking = useCallback(async (id) => {
+    const { error } = await supabase
+      .from('room_bookings')
+      .delete()
+      .eq('id', id);
+    if (!error) await fetchRoomBookings();
+    return { error };
+  }, [fetchRoomBookings]);
 
   const value = {
-    session, login, logout,
-    books, addBook, updateBook, deleteBook,
+    session, login, logout, loading,
+    books, addBook, updateBook, deleteBook, fetchBooks,
     reservations, addReservation, updateReservationStatus, cancelReservation,
+    addRoomBooking, updateRoomBookingStatus, cancelRoomBooking,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

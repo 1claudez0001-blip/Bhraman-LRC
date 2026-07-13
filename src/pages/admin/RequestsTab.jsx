@@ -3,11 +3,14 @@ import { useApp } from '@/context/AppContext';
 import StatusBadge from '@/components/StatusBadge';
 import AdminReviewModal from '@/components/admin/AdminReviewModal';
 import { Eye, Undo2 } from 'lucide-react';
+import { formatDate } from '@/lib/format';
 
 export default function RequestsTab() {
   const { reservations, updateReservationStatus } = useApp();
   const [reviewing, setReviewing] = useState(null);
-  const bookRes = reservations.filter((r) => r.type === 'book');
+
+  // Book reservations only (no type === 'room')
+  const bookRes = reservations.filter((r) => r.type !== 'room');
 
   return (
     <div className="space-y-5">
@@ -26,6 +29,7 @@ export default function RequestsTab() {
                 <tr>
                   <th className="text-left px-5 py-3 font-semibold">Student</th>
                   <th className="text-left px-5 py-3 font-semibold">Book</th>
+                  <th className="text-left px-5 py-3 font-semibold">Date</th>
                   <th className="text-left px-5 py-3 font-semibold">Status</th>
                   <th className="text-right px-5 py-3 font-semibold">Action</th>
                 </tr>
@@ -34,23 +38,32 @@ export default function RequestsTab() {
                 {bookRes.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50/60">
                     <td className="px-5 py-3">
-                      <p className="font-semibold text-gray-900">{r.studentName}</p>
-                      <p className="text-xs text-ub-gray">{r.student}</p>
+                      <p className="font-semibold text-gray-900">{r.users?.name || '—'}</p>
+                      <p className="text-xs text-ub-gray">{r.users?.student_id || '—'}</p>
                     </td>
-                    <td className="px-5 py-3 text-gray-700">{r.detail}</td>
+                    <td className="px-5 py-3 text-gray-700">{r.books?.title || '—'}</td>
+                    <td className="px-5 py-3 text-ub-gray">{formatDate(r.date)}</td>
                     <td className="px-5 py-3"><StatusBadge status={r.status} /></td>
                     <td className="px-5 py-3 text-right">
                       {r.status === 'pending' && (
-                        <button onClick={() => setReviewing(r)} className="inline-flex items-center gap-1 text-xs font-semibold text-ub-red px-2.5 py-1 rounded-lg hover:bg-red-50 cursor-pointer">
+                        <button
+                          onClick={() => setReviewing(r)}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-ub-red px-2.5 py-1 rounded-lg hover:bg-red-50 cursor-pointer"
+                        >
                           <Eye size={12} /> View Details
                         </button>
                       )}
                       {r.status === 'approved' && (
-                        <button onClick={() => updateReservationStatus(r.id, 'returned')} className="inline-flex items-center gap-1 text-xs font-semibold text-ub-green px-2.5 py-1 rounded-lg hover:bg-green-50 cursor-pointer">
+                        <button
+                          onClick={() => updateReservationStatus(r.id, 'returned')}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-green-600 px-2.5 py-1 rounded-lg hover:bg-green-50 cursor-pointer"
+                        >
                           <Undo2 size={12} /> Mark Returned
                         </button>
                       )}
-                      {(r.status === 'returned' || r.status === 'rejected') && <span className="text-xs text-ub-gray">Completed</span>}
+                      {(r.status === 'returned' || r.status === 'rejected') && (
+                        <span className="text-xs text-ub-gray">Completed</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -60,7 +73,11 @@ export default function RequestsTab() {
         )}
       </div>
 
-      <AdminReviewModal open={!!reviewing} onClose={() => setReviewing(null)} reservation={reviewing} />
+      <AdminReviewModal
+        open={!!reviewing}
+        onClose={() => setReviewing(null)}
+        reservation={reviewing}
+      />
     </div>
   );
 }
