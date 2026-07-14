@@ -1,6 +1,5 @@
 import React from 'react';
 import { useApp } from '@/context/AppContext';
-import { ROOMS } from '@/lib/constants';
 import { BookOpen, Clock, CheckCircle, ClipboardList, Download, Lightbulb } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -12,9 +11,13 @@ function csvEscape(v) {
 
 export default function DashboardTab() {
   const { books, reservations } = useApp();
+
+  const bookRes = reservations.filter((r) => r.type === 'book');
+  const roomRes = reservations.filter((r) => r.type === 'room');
+
   const pending = reservations.filter((r) => r.status === 'pending').length;
   const approved = reservations.filter((r) => r.status === 'approved').length;
-  const returned = reservations.filter((r) => r.status === 'returned').length;
+  const returned = bookRes.filter((r) => r.status === 'returned').length;
 
   const stats = [
     { label: 'Total Books', value: books.length, icon: BookOpen, color: 'bg-red-50 text-ub-red' },
@@ -26,18 +29,41 @@ export default function DashboardTab() {
   const exportCSV = () => {
     const ts = new Date().toLocaleString();
     const lines = [];
+
     lines.push('Section 1: Book Reservations');
-    lines.push(['ID', 'Type', 'Student Name', 'Student ID', 'Book', 'Purpose', 'Date', 'Status', 'Export Timestamp'].join(','));
-    reservations.filter((r) => r.type === 'book').forEach((r) => {
-      lines.push([r.id, 'book', r.studentName, r.student, r.detail, r.borrowingPurpose, r.date, r.status, ts].map(csvEscape).join(','));
+    lines.push(['ID', 'Student Name', 'Student ID', 'Book', 'Author', 'Purpose', 'Date', 'Status', 'Export Timestamp'].join(','));
+    bookRes.forEach((r) => {
+      lines.push([
+        r.id,
+        r.users?.name,
+        r.users?.student_id,
+        r.books?.title,
+        r.books?.author,
+        r.purpose,
+        r.date,
+        r.status,
+        ts,
+      ].map(csvEscape).join(','));
     });
+
     lines.push('');
     lines.push('Section 2: Room Bookings');
-    lines.push(['ID', 'Type', 'Student Name', 'Student ID', 'Room', 'Capacity', 'Date & Time', 'Purpose', 'Date Booked', 'Status', 'Export Timestamp'].join(','));
-    reservations.filter((r) => r.type === 'room').forEach((r) => {
-      const room = ROOMS.find((rm) => rm.id === r.roomId);
-      lines.push([r.id, 'room', r.studentName, r.student, room?.name || r.roomId, room?.capacity || '', r.roomSlot, r.borrowingPurpose, r.date, r.status, ts].map(csvEscape).join(','));
+    lines.push(['ID', 'Student Name', 'Student ID', 'Room', 'Capacity', 'Date', 'Time Slot', 'Purpose', 'Status', 'Export Timestamp'].join(','));
+    roomRes.forEach((r) => {
+      lines.push([
+        r.id,
+        r.users?.name,
+        r.users?.student_id,
+        r.rooms?.name || r.room_id,
+        r.rooms?.capacity,
+        r.date,
+        r.time_slot,
+        r.purpose,
+        r.status,
+        ts,
+      ].map(csvEscape).join(','));
     });
+
     lines.push('');
     lines.push('Section 3: Summary');
     lines.push(['Total Books', 'Total Reservations', 'Pending', 'Approved', 'Returned', 'Export Date'].join(','));
@@ -68,7 +94,10 @@ export default function DashboardTab() {
           <h1 className="font-display text-3xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-ub-gray mt-1">Overview of library activity.</p>
         </div>
-        <button onClick={exportCSV} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-ub-green text-white text-sm font-semibold hover:bg-emerald-600 transition cursor-pointer">
+        <button
+          onClick={exportCSV}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-ub-green text-white text-sm font-semibold hover:bg-emerald-600 transition cursor-pointer"
+        >
           <Download size={18} /> Export to Excel
         </button>
       </div>
@@ -78,7 +107,9 @@ export default function DashboardTab() {
           const Icon = s.icon;
           return (
             <div key={s.label} className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-              <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${s.color}`}><Icon size={22} /></div>
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${s.color}`}>
+                <Icon size={22} />
+              </div>
               <p className="text-3xl font-bold text-gray-900 mt-3">{s.value}</p>
               <p className="text-sm text-ub-gray">{s.label}</p>
             </div>

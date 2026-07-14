@@ -18,8 +18,13 @@ export default function CatalogTab() {
     return collegeOk && searchOk;
   }), [books, filters, search]);
 
+  // Check if student already has an active reservation for this book
   const activeReservationFor = (bookId) => reservations.find(
-    (r) => r.type === 'book' && r.bookId === bookId && r.student === session.userId && (r.status === 'pending' || r.status === 'approved')
+    (r) =>
+      r.type === 'book' &&
+      r.book_id === bookId &&
+      r.user_id === session.userDbId &&
+      (r.status === 'pending' || r.status === 'approved')
   );
 
   return (
@@ -42,16 +47,27 @@ export default function CatalogTab() {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center text-ub-gray">No books match your search.</div>
+        <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center text-ub-gray">
+          No books match your search.
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((book) => (
-            <BookCard key={book.id} book={book} activeReservation={activeReservationFor(book.id)} onReserve={() => setReservingBook(book)} />
+            <BookCard
+              key={book.id}
+              book={book}
+              activeReservation={activeReservationFor(book.id)}
+              onReserve={() => setReservingBook(book)}
+            />
           ))}
         </div>
       )}
 
-      <BookReservationModal open={!!reservingBook} onClose={() => setReservingBook(null)} book={reservingBook} />
+      <BookReservationModal
+        open={!!reservingBook}
+        onClose={() => setReservingBook(null)}
+        book={reservingBook}
+      />
     </div>
   );
 }

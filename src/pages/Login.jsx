@@ -1,36 +1,98 @@
 import React, { useState } from 'react';
 import { useApp } from '@/context/AppContext';
-import { UB_LOGO_URL, DEMO_CREDENTIALS } from '@/lib/constants';
-import { GraduationCap, Shield, Eye, EyeOff, AlertCircle } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { UB_LOGO_URL } from '@/lib/constants';
+import { Eye, EyeOff, AlertCircle, CheckCircle2, Mail } from 'lucide-react';
+
+const TABS = { login: 'login', register: 'register' };
 
 export default function Login() {
-  const { login } = useApp();
-  const [tab, setTab] = useState('student');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
-  const [showPass, setShowPass] = useState(false);
+  const { login, register } = useApp();
 
-  const handleSubmit = (e) => {
+  const [tab, setTab] = useState(TABS.login);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [name, setName] = useState('');
+  const [studentId, setStudentId] = useState('');
+  const [showPass, setShowPass] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
+
+  const isUBEmail = (e) => e.trim().toLowerCase().endsWith('@ub.edu.ph');
+
+  const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
-    const res = login(tab, username.trim(), password);
+
+    if (!isUBEmail(email)) {
+      setError('Please use your UB email address (@ub.edu.ph).');
+      return;
+    }
+
+    setLoading(true);
+    const res = await login(email.trim(), password);
+    setLoading(false);
+
+    if (!res.success) {
+      setError(res.error);
+    }
+  };
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (!name.trim()) { setError('Please enter your full name.'); return; }
+    if (!studentId.trim()) { setError('Please enter your Student ID.'); return; }
+    if (!isUBEmail(email)) { setError('Please use your UB email address (@ub.edu.ph).'); return; }
+    if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
+
+    setLoading(true);
+    const res = await register(email.trim(), password, name.trim(), studentId.trim());
+    setLoading(false);
+
     if (!res.success) {
       setError(res.error);
       return;
     }
-    setSuccess(true);
-    toast.success(`Welcome, ${DEMO_CREDENTIALS[tab].name}!`);
-    setTimeout(() => {
-      /* session state change re-renders to the dashboard */
-    }, 870);
+    setVerificationSent(true);
   };
 
+  // ── Verification sent screen ─────────────────────────────────────────────
+  if (verificationSent) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-ub-lightGold via-white to-gray-50">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-100 p-8 text-center animate-scale-in">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Mail size={32} className="text-green-600" />
+          </div>
+          <h2 className="font-display text-2xl font-bold text-gray-900 mb-2">Check your UB Mail!</h2>
+          <p className="text-ub-gray text-sm mb-4">
+            We sent a verification link to <span className="font-semibold text-gray-800">{email}</span>.
+            Click the link in that email to activate your account.
+          </p>
+          <p className="text-xs text-ub-gray mb-6">
+            Can't find it? Check your spam folder or make sure you used the correct UB email.
+          </p>
+          <button
+            onClick={() => { setVerificationSent(false); setTab(TABS.login); }}
+            className="w-full py-2.5 rounded-xl bg-ub-red text-white font-semibold hover:bg-ub-darkRed transition cursor-pointer"
+          >
+            Back to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main login/register screen ───────────────────────────────────────────
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-ub-lightGold via-white to-gray-50">
       <div className="w-full max-w-md">
+
+        {/* Logo */}
         <div className="flex flex-col items-center mb-6">
           <img
             src={UB_LOGO_URL}
@@ -38,102 +100,195 @@ export default function Login() {
             className="h-20 object-contain mb-3"
             onError={(e) => { e.target.style.display = 'none'; }}
           />
-          <h1 className="font-display text-2xl font-bold text-ub-red flex items-center gap-2">🏛️ UB Library</h1>
-          <p className="text-sm text-ub-gray mt-1">Library &amp; Resource Center</p>
+          <h1 className="font-display text-2xl font-bold text-ub-red">UB Library</h1>
+          <p className="text-sm text-ub-gray mt-1">Library & Resource Center</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 animate-scale-in">
+
+          {/* Tab switcher */}
           <div className="grid grid-cols-2 gap-1 p-1 bg-gray-100 rounded-xl mb-5">
             <button
-              onClick={() => setTab('student')}
-              className={`flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition cursor-pointer ${tab === 'student' ? 'bg-white text-ub-red shadow-sm' : 'text-ub-gray'}`}
+              onClick={() => { setTab(TABS.login); setError(''); }}
+              className={`py-2 rounded-lg text-sm font-semibold transition cursor-pointer ${tab === TABS.login ? 'bg-white text-ub-red shadow-sm' : 'text-ub-gray'}`}
             >
-              <GraduationCap size={16} /> Student
+              Sign In
             </button>
             <button
-              onClick={() => setTab('admin')}
-              className={`flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition cursor-pointer ${tab === 'admin' ? 'bg-white text-ub-red shadow-sm' : 'text-ub-gray'}`}
+              onClick={() => { setTab(TABS.register); setError(''); }}
+              className={`py-2 rounded-lg text-sm font-semibold transition cursor-pointer ${tab === TABS.register ? 'bg-white text-ub-red shadow-sm' : 'text-ub-gray'}`}
             >
-              <Shield size={16} /> Admin
+              Register
             </button>
           </div>
 
-          <h2 className="font-heading text-lg font-semibold text-gray-900">
-            {tab === 'student' ? 'Student Login' : 'Admin Login'}
-          </h2>
-          <p className="text-sm text-ub-gray mb-4">
-            {tab === 'student' ? 'Access the catalog and reserve resources.' : 'Manage reservations and the catalog.'}
-          </p>
+          {/* ── LOGIN FORM ── */}
+          {tab === TABS.login && (
+            <>
+              <h2 className="font-heading text-lg font-semibold text-gray-900">Welcome back!</h2>
+              <p className="text-sm text-ub-gray mb-4">Sign in with your UB email address.</p>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
-              <input
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-ub-red focus:ring-2 focus:ring-ub-red/20 outline-none transition"
-                placeholder="Enter username"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <div className="relative">
-                <input
-                  type={showPass ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-2.5 pr-10 rounded-xl border border-gray-200 focus:border-ub-red focus:ring-2 focus:ring-ub-red/20 outline-none transition"
-                  placeholder="Enter password"
-                />
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">UB Email</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-ub-red focus:ring-2 focus:ring-ub-red/20 outline-none transition"
+                    placeholder="2300000@ub.edu.ph"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                  <div className="relative">
+                    <input
+                      type={showPass ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full px-4 py-2.5 pr-10 rounded-xl border border-gray-200 focus:border-ub-red focus:ring-2 focus:ring-ub-red/20 outline-none transition"
+                      placeholder="Enter password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPass((s) => !s)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-ub-gray hover:text-gray-700 cursor-pointer"
+                    >
+                      {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+                    <AlertCircle size={16} /> {error}
+                  </div>
+                )}
+
                 <button
-                  type="button"
-                  onClick={() => setShowPass((s) => !s)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-ub-gray hover:text-gray-700 cursor-pointer"
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-2.5 rounded-xl bg-ub-red text-white font-semibold hover:bg-ub-darkRed transition cursor-pointer disabled:opacity-60"
                 >
-                  {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {loading ? 'Signing in…' : 'Sign In'}
                 </button>
-              </div>
-            </div>
+              </form>
 
-            {error && (
-              <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
-                <AlertCircle size={16} /> {error}
-              </div>
-            )}
-            {success && (
-              <div className="text-sm text-green-700 bg-green-50 px-3 py-2 rounded-lg">Login successful! Redirecting…</div>
-            )}
+              <p className="text-center text-xs text-ub-gray mt-4">
+                Don't have an account?{' '}
+                <button
+                  onClick={() => { setTab(TABS.register); setError(''); }}
+                  className="text-ub-red font-semibold hover:underline cursor-pointer"
+                >
+                  Register here
+                </button>
+              </p>
+            </>
+          )}
 
-            <button
-              type="submit"
-              disabled={success}
-              className="w-full py-2.5 rounded-xl bg-ub-red text-white font-semibold hover:bg-ub-darkRed transition cursor-pointer disabled:opacity-60"
-            >
-              {tab === 'student' ? 'Sign In as Student' : 'Sign In as Admin'}
-            </button>
-          </form>
+          {/* ── REGISTER FORM ── */}
+          {tab === TABS.register && (
+            <>
+              <h2 className="font-heading text-lg font-semibold text-gray-900">Create account</h2>
+              <p className="text-sm text-ub-gray mb-4">Use your UB email to register.</p>
 
-          <div className="mt-5 pt-4 border-t border-gray-100">
-            <p className="text-xs font-semibold text-ub-gray mb-2">Demo credentials</p>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="bg-ub-lightGold rounded-lg px-3 py-2">
-                <p className="font-semibold text-ub-red">Student</p>
-                <p className="text-ub-gray">user123 / pass123</p>
-              </div>
-              <div className="bg-ub-lightGold rounded-lg px-3 py-2">
-                <p className="font-semibold text-ub-red">Admin</p>
-                <p className="text-ub-gray">admin / admin123</p>
-              </div>
-            </div>
-            <button
-              onClick={() => alert('Please visit the Library front desk to request an account.')}
-              className="mt-3 text-xs text-ub-gray hover:text-ub-red underline cursor-pointer"
-            >
-              No account? Contact Library
-            </button>
-          </div>
+              <form onSubmit={handleRegister} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-ub-red focus:ring-2 focus:ring-ub-red/20 outline-none transition"
+                    placeholder="Juan Dela Cruz"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ID Number</label>
+                  <input
+                    value={studentId}
+                    onChange={(e) => setStudentId(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-ub-red focus:ring-2 focus:ring-ub-red/20 outline-none transition"
+                    placeholder="e.g. 2300000 or A-001"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">UB Email</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-ub-red focus:ring-2 focus:ring-ub-red/20 outline-none transition"
+                    placeholder="2300000@ub.edu.ph"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                  <div className="relative">
+                    <input
+                      type={showPass ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full px-4 py-2.5 pr-10 rounded-xl border border-gray-200 focus:border-ub-red focus:ring-2 focus:ring-ub-red/20 outline-none transition"
+                      placeholder="At least 6 characters"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPass((s) => !s)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-ub-gray hover:text-gray-700 cursor-pointer"
+                    >
+                      {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-ub-red focus:ring-2 focus:ring-ub-red/20 outline-none transition"
+                    placeholder="Repeat password"
+                    required
+                  />
+                </div>
+
+                {error && (
+                  <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+                    <AlertCircle size={16} /> {error}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-2.5 rounded-xl bg-ub-red text-white font-semibold hover:bg-ub-darkRed transition cursor-pointer disabled:opacity-60"
+                >
+                  {loading ? 'Creating account…' : 'Create Account'}
+                </button>
+              </form>
+
+              <p className="text-center text-xs text-ub-gray mt-4">
+                Already have an account?{' '}
+                <button
+                  onClick={() => { setTab(TABS.login); setError(''); }}
+                  className="text-ub-red font-semibold hover:underline cursor-pointer"
+                >
+                  Sign in
+                </button>
+              </p>
+            </>
+          )}
         </div>
-        <p className="text-center text-xs text-ub-gray mt-4">University of Batangas · Library Resource Center</p>
+
+        <p className="text-center text-xs text-ub-gray mt-4">
+          University of Batangas · Library Resource Center
+        </p>
       </div>
     </div>
   );

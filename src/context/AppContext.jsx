@@ -17,7 +17,7 @@ export function AppProvider({ children }) {
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // ─── Fetch books from Supabase ───────────────────────────────────────────
+  // ─── Fetch books ─────────────────────────────────────────────────────────
   const fetchBooks = useCallback(async () => {
     const { data, error } = await supabase
       .from('books')
@@ -26,26 +26,34 @@ export function AppProvider({ children }) {
     if (!error) setBooks(data || []);
   }, []);
 
-  // ─── Fetch reservations from Supabase ────────────────────────────────────
+  // ─── Fetch book reservations ──────────────────────────────────────────────
   const fetchReservations = useCallback(async () => {
     const { data, error } = await supabase
       .from('reservations')
       .select('*, books(title, author), users(name, student_id)')
       .order('created_at', { ascending: false });
-    if (!error) setReservations(data || []);
+    if (!error) {
+      const withType = (data || []).map(r => ({ ...r, type: 'book' }));
+      setReservations(prev => {
+        const roomOnly = prev.filter(r => r.type === 'room');
+        return [...withType, ...roomOnly];
+      });
+    }
   }, []);
 
+  // ─── Fetch room bookings ──────────────────────────────────────────────────
   const fetchRoomBookings = useCallback(async () => {
     const { data, error } = await supabase
       .from('room_bookings')
       .select('*, rooms(name, capacity), users(name, student_id)')
       .order('created_at', { ascending: false });
-    if (!error) setReservations(prev => {
-      // Merge room bookings into reservations array with a type flag
-      const bookOnly = prev.filter(r => r.type !== 'room');
+    if (!error) {
       const withType = (data || []).map(r => ({ ...r, type: 'room' }));
-      return [...bookOnly, ...withType];
-    });
+      setReservations(prev => {
+        const bookOnly = prev.filter(r => r.type === 'book');
+        return [...bookOnly, ...withType];
+      });
+    }
   }, []);
 
   useEffect(() => {
@@ -59,37 +67,84 @@ export function AppProvider({ children }) {
     load();
   }, [fetchBooks, fetchReservations, fetchRoomBookings]);
 
-  // ─── AUTH ────────────────────────────────────────────────────────────────
-  const login = useCallback(async (userType, studentId, password) => {
-    const { data, error } = await supabase
+  // ─── Detect role from email pattern ──────────────────────────────────────
+  const detectRole = (email) => {
+    const localPart = email.split('@')[0];
+    return /^\d/.test(localPart) ? 'student' : 'admin';
+  };
+
+  // ─── REGISTER ────────────────────────────────────────────────────────────
+  const register = useCallback(async (email, password, name, studentId) => {
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { name, student_id: studentId },
+      },
+    });
+
+    if (authError) return { success: false, error: authError.message };
+
+    const role = detectRole(email);
+    const { error: dbError } = await supabase
+      .from('users')
+      .insert([{
+        id: authData.user.id,
+        name,
+        student_id: studentId,
+        email,
+        password: '',
+        role,
+      }]);
+
+    if (dbError) return { success: false, error: dbError.message };
+    return { success: true };
+  }, []);
+
+  // ─── LOGIN ────────────────────────────────────────────────────────────────
+  const login = useCallback(async (email, password) => {
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (authError) {
+      if (authError.message.includes('Email not confirmed')) {
+        return { success: false, error: 'Please verify your email first. Check your UB Mail inbox.' };
+      }
+      return { success: false, error: 'Invalid email or password.' };
+    }
+
+    const { data: userData, error: userError } = await supabase
       .from('users')
       .select('*')
-      .eq('student_id', studentId)
-      .eq('password', password)
-      .eq('role', userType)
+      .eq('id', authData.user.id)
       .single();
 
-    if (error || !data) {
-      return { success: false, error: 'Invalid ID or password' };
+    if (userError || !userData) {
+      return { success: false, error: 'Account not found. Please register first.' };
     }
 
     const newSession = {
-      userType: data.role,
-      userName: data.name,
-      userId: data.student_id,
-      userDbId: data.id,
+      userType: userData.role,
+      userName: userData.name,
+      userId: userData.student_id,
+      userDbId: userData.id,
     };
+
     sessionStorage.setItem('ublib_session', JSON.stringify(newSession));
     setSession(newSession);
     return { success: true };
   }, []);
 
-  const logout = useCallback(() => {
+  // ─── LOGOUT ───────────────────────────────────────────────────────────────
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
     sessionStorage.removeItem('ublib_session');
     setSession({ userType: null, userName: null, userId: null, userDbId: null });
   }, []);
 
-  // ─── BOOKS CRUD ──────────────────────────────────────────────────────────
+  // ─── BOOKS CRUD ───────────────────────────────────────────────────────────
   const addBook = useCallback(async (book) => {
     const { data, error } = await supabase
       .from('books')
@@ -118,7 +173,7 @@ export function AppProvider({ children }) {
     return { error };
   }, [fetchBooks]);
 
-  // ─── BOOK RESERVATIONS ───────────────────────────────────────────────────
+  // ─── BOOK RESERVATIONS ────────────────────────────────────────────────────
   const addReservation = useCallback(async (reservation) => {
     const { data, error } = await supabase
       .from('reservations')
@@ -132,10 +187,7 @@ export function AppProvider({ children }) {
       }])
       .select()
       .single();
-
-    if (!error) {
-      await fetchReservations();
-    }
+    if (!error) await fetchReservations();
     return { data, error };
   }, [session.userDbId, fetchReservations]);
 
@@ -145,16 +197,14 @@ export function AppProvider({ children }) {
       .update({ status })
       .eq('id', id);
 
-    // If approved, decrement available_copies
     if (!error && status === 'approved') {
-      const res = reservations.find(r => r.id === id && r.type !== 'room');
+      const res = reservations.find(r => r.id === id && r.type === 'book');
       if (res?.book_id) {
         await supabase.rpc('decrement_available_copies', { book_id: res.book_id });
       }
     }
-    // If returned, increment available_copies
     if (!error && status === 'returned') {
-      const res = reservations.find(r => r.id === id && r.type !== 'room');
+      const res = reservations.find(r => r.id === id && r.type === 'book');
       if (res?.book_id) {
         await supabase.rpc('increment_available_copies', { book_id: res.book_id });
       }
@@ -173,7 +223,7 @@ export function AppProvider({ children }) {
     return { error };
   }, [fetchReservations]);
 
-  // ─── ROOM BOOKINGS ───────────────────────────────────────────────────────
+  // ─── ROOM BOOKINGS ────────────────────────────────────────────────────────
   const addRoomBooking = useCallback(async (booking) => {
     const { data, error } = await supabase
       .from('room_bookings')
@@ -188,7 +238,6 @@ export function AppProvider({ children }) {
       }])
       .select()
       .single();
-
     if (!error) await fetchRoomBookings();
     return { data, error };
   }, [session.userDbId, fetchRoomBookings]);
@@ -212,7 +261,7 @@ export function AppProvider({ children }) {
   }, [fetchRoomBookings]);
 
   const value = {
-    session, login, logout, loading,
+    session, login, logout, register, loading,
     books, addBook, updateBook, deleteBook, fetchBooks,
     reservations, addReservation, updateReservationStatus, cancelReservation,
     addRoomBooking, updateRoomBookingStatus, cancelRoomBooking,

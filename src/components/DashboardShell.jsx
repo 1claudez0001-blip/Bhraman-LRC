@@ -11,6 +11,7 @@ import DashboardTab from '@/pages/admin/DashboardTab';
 import RequestsTab from '@/pages/admin/RequestsTab';
 import RoomRequestsTab from '@/pages/admin/RoomRequestsTab';
 import BooksTab from '@/pages/admin/BooksTab';
+import ubLogo from '@/assets/UB_LIPA_LOGO.png';
 
 export default function DashboardShell() {
   const { session } = useApp();
@@ -53,22 +54,33 @@ export default function DashboardShell() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex">
+    <div className="min-h-screen bg-gray-50 flex">
       <Sidebar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} />
+
       <div className="flex-1 flex flex-col min-w-0">
         <MobileNavbar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} />
 
         {/* Top header bar — desktop only */}
-        <div className="hidden md:flex items-center justify-between px-8 py-4 bg-white border-b border-gray-200">
-          <h1 className="text-lg font-bold text-gray-800">
-            University of Batangas — Library & Resource Center
-          </h1>
+        <div className="hidden md:flex items-center justify-between px-8 py-3.5 bg-white border-b border-gray-100 shadow-sm">
+          <div className="flex items-center gap-3">
+            <img src={ubLogo} alt="UB" className="w-8 h-8 object-contain" />
+            <div>
+              <p className="text-sm font-bold text-gray-800 leading-tight">
+                University of Batangas
+              </p>
+              <p className="text-[11px] text-gray-400 leading-tight tracking-wide">
+                Library & Resource Center
+              </p>
+            </div>
+          </div>
           <div className="flex items-center gap-3">
             <div className="text-right">
-              <p className="text-sm font-semibold text-gray-800">{session.userName}</p>
-              <p className="text-xs text-gray-400">{session.userId} · {isStudent ? 'Student' : 'Admin'}</p>
+              <p className="text-sm font-semibold text-gray-800 leading-tight">{session.userName}</p>
+              <p className="text-[11px] text-gray-400 leading-tight">
+                {session.userId} · {isStudent ? 'Student' : 'Admin'}
+              </p>
             </div>
-            <div className="w-9 h-9 rounded-full bg-ub-red flex items-center justify-center text-white font-bold text-sm">
+            <div className="w-9 h-9 rounded-full bg-ub-red flex items-center justify-center text-white font-bold text-sm shadow-md shadow-ub-red/30">
               {session.userName?.charAt(0).toUpperCase()}
             </div>
           </div>

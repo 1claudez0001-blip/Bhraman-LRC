@@ -19,7 +19,10 @@ export default function BooksTab() {
           <h1 className="font-display text-3xl font-bold text-gray-900">Catalog</h1>
           <p className="text-ub-gray mt-1">Manage the book collection.</p>
         </div>
-        <button onClick={() => { setEditing(null); setFormOpen(true); }} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-ub-red text-white text-sm font-semibold hover:bg-ub-darkRed transition cursor-pointer">
+        <button
+          onClick={() => { setEditing(null); setFormOpen(true); }}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-ub-red text-white text-sm font-semibold hover:bg-ub-darkRed transition cursor-pointer"
+        >
           <Plus size={18} /> Add Book
         </button>
       </div>
@@ -35,6 +38,8 @@ export default function BooksTab() {
                   <th className="text-left px-5 py-3 font-semibold">Title</th>
                   <th className="text-left px-5 py-3 font-semibold">Author</th>
                   <th className="text-left px-5 py-3 font-semibold">College</th>
+                  <th className="text-center px-5 py-3 font-semibold">Copies</th>
+                  <th className="text-center px-5 py-3 font-semibold">Available</th>
                   <th className="text-right px-5 py-3 font-semibold">Actions</th>
                 </tr>
               </thead>
@@ -48,12 +53,27 @@ export default function BooksTab() {
                         {COLLEGE_LABELS[b.college] || b.college}
                       </span>
                     </td>
+                    <td className="px-5 py-3 text-center text-gray-700 font-medium">
+                      {b.total_copies}
+                    </td>
+                    <td className="px-5 py-3 text-center">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold
+                        ${b.available_copies === 0 ? 'bg-red-50 text-red-500' : 'bg-green-50 text-ub-green'}`}>
+                        {b.available_copies}/{b.total_copies}
+                      </span>
+                    </td>
                     <td className="px-5 py-3">
                       <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => { setEditing(b); setFormOpen(true); }} className="inline-flex items-center gap-1 text-xs font-semibold text-ub-gray hover:text-ub-red px-2.5 py-1 rounded-lg hover:bg-gray-100 cursor-pointer">
+                        <button
+                          onClick={() => { setEditing(b); setFormOpen(true); }}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-ub-gray hover:text-ub-red px-2.5 py-1 rounded-lg hover:bg-gray-100 cursor-pointer"
+                        >
                           <Edit size={12} /> Edit
                         </button>
-                        <button onClick={() => setDeleting(b)} className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-ub-red px-2.5 py-1 rounded-lg hover:bg-red-50 cursor-pointer">
+                        <button
+                          onClick={() => setDeleting(b)}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-ub-red px-2.5 py-1 rounded-lg hover:bg-red-50 cursor-pointer"
+                        >
                           <Trash2 size={12} /> Delete
                         </button>
                       </div>
@@ -73,9 +93,18 @@ export default function BooksTab() {
           Are you sure you want to delete <span className="font-semibold">{deleting?.title}</span>? This cannot be undone.
         </p>
         <div className="flex gap-3 mt-5">
-          <button onClick={() => setDeleting(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 transition cursor-pointer">Cancel</button>
           <button
-            onClick={() => { deleteBook(deleting.id); toast.success('Book deleted.'); setDeleting(null); }}
+            onClick={() => setDeleting(null)}
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 transition cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={async () => {
+              await deleteBook(deleting.id);
+              toast.success('Book deleted.');
+              setDeleting(null);
+            }}
             className="flex-1 py-2.5 rounded-xl bg-ub-red text-white font-semibold hover:bg-ub-darkRed transition cursor-pointer"
           >
             Delete
