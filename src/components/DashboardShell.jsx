@@ -12,6 +12,7 @@ import RequestsTab from '@/pages/admin/RequestsTab';
 import RoomRequestsTab from '@/pages/admin/RoomRequestsTab';
 import BooksTab from '@/pages/admin/BooksTab';
 import ubLogo from '@/assets/UB_LIPA_LOGO.png';
+import NotificationBell from '@/components/NotificationBell';
 
 export default function DashboardShell() {
   const { session } = useApp();
@@ -74,6 +75,7 @@ export default function DashboardShell() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <NotificationBell />
             <div className="text-right">
               <p className="text-sm font-semibold text-gray-800 leading-tight">{session.userName}</p>
               <p className="text-[11px] text-gray-400 leading-tight">

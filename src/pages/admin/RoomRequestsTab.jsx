@@ -55,7 +55,7 @@ export default function RoomRequestsTab() {
                           <Eye size={12} /> View Details
                         </button>
                       ) : (
-                        <StatusBadge status={r.status} />
+                        <span className="text-xs text-ub-gray">—</span>
                       )}
                     </td>
                   </tr>

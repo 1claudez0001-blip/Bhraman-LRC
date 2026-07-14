@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '@/context/AppContext';
-import { UB_LOGO_URL } from '@/lib/constants';
-import { Eye, EyeOff, AlertCircle, CheckCircle2, Mail } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle, Mail } from 'lucide-react';
+import ubLogo from '@/assets/UB_LIPA_LOGO.png';
 
 const TABS = { login: 'login', register: 'register' };
 
@@ -95,10 +95,9 @@ export default function Login() {
         {/* Logo */}
         <div className="flex flex-col items-center mb-6">
           <img
-            src={UB_LOGO_URL}
+            src={ubLogo}
             alt="University of Batangas"
             className="h-20 object-contain mb-3"
-            onError={(e) => { e.target.style.display = 'none'; }}
           />
           <h1 className="font-display text-2xl font-bold text-ub-red">UB Library</h1>
           <p className="text-sm text-ub-gray mt-1">Library & Resource Center</p>

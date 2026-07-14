@@ -3,20 +3,24 @@ import { useApp } from '@/context/AppContext';
 import StatusBadge from '@/components/StatusBadge';
 import CalendarModal from '@/components/student/CalendarModal';
 import ReservationFormModal from '@/components/student/ReservationFormModal';
-import { ROOMS } from '@/lib/constants';
-import { todayStr, formatSlot } from '@/lib/format';
+import { todayStr } from '@/lib/format';
 import { Plus, AlertTriangle, X } from 'lucide-react';
 
 export default function RoomsTab() {
-  const { session, reservations, cancelReservation } = useApp();
+  const { session, reservations, cancelRoomBooking } = useApp(); // Bug 4 fixed: cancelRoomBooking
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [selection, setSelection] = useState(null);
 
-  const myRoomRes = reservations.filter((r) => r.type === 'room' && r.student === session.userId);
-  const todays = myRoomRes.filter((r) => r.date === todayStr() && (r.status === 'pending' || r.status === 'approved'));
+  // Bug 2 fixed: user_id === session.userDbId
+  const myRoomRes = reservations.filter(
+    (r) => r.type === 'room' && r.user_id === session.userDbId
+  );
+
+  const todays = myRoomRes.filter(
+    (r) => r.date === todayStr() && (r.status === 'pending' || r.status === 'approved')
+  );
   const atLimit = todays.length >= 3;
-  const roomName = (id) => ROOMS.find((r) => r.id === id)?.name || id;
 
   return (
     <div className="space-y-5">
@@ -28,7 +32,11 @@ export default function RoomsTab() {
         <button
           onClick={() => setCalendarOpen(true)}
           disabled={atLimit}
-          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition ${atLimit ? 'bg-gray-100 text-ub-gray cursor-not-allowed' : 'bg-ub-red text-white hover:bg-ub-darkRed cursor-pointer'}`}
+          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition
+            ${atLimit
+              ? 'bg-gray-100 text-ub-gray cursor-not-allowed'
+              : 'bg-ub-red text-white hover:bg-ub-darkRed cursor-pointer'
+            }`}
         >
           <Plus size={18} /> Reserve Room <span className="opacity-80">· Max 3</span>
         </button>
@@ -52,7 +60,8 @@ export default function RoomsTab() {
               <thead className="bg-gray-50 text-ub-gray text-xs uppercase">
                 <tr>
                   <th className="text-left px-5 py-3 font-semibold">Room</th>
-                  <th className="text-left px-5 py-3 font-semibold">Date &amp; Time</th>
+                  <th className="text-left px-5 py-3 font-semibold">Date</th>
+                  <th className="text-left px-5 py-3 font-semibold">Time</th>
                   <th className="text-left px-5 py-3 font-semibold">Status</th>
                   <th className="text-right px-5 py-3 font-semibold">Action</th>
                 </tr>
@@ -60,15 +69,26 @@ export default function RoomsTab() {
               <tbody className="divide-y divide-gray-100">
                 {myRoomRes.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50/60">
-                    <td className="px-5 py-3 font-medium text-gray-900">{roomName(r.roomId)}</td>
-                    <td className="px-5 py-3 text-ub-gray">{formatSlot(r.roomSlot)}</td>
+                    {/* Bug 3 fixed: r.rooms?.name and r.room_id instead of r.roomId */}
+                    <td className="px-5 py-3 font-medium text-gray-900">
+                      {r.rooms?.name || r.room_id}
+                    </td>
+                    <td className="px-5 py-3 text-ub-gray">{r.date}</td>
+                    {/* Bug 3 fixed: r.time_slot instead of r.roomSlot */}
+                    <td className="px-5 py-3 text-ub-gray">{r.time_slot}</td>
                     <td className="px-5 py-3"><StatusBadge status={r.status} /></td>
                     <td className="px-5 py-3 text-right">
                       {r.status === 'pending' ? (
-                        <button onClick={() => cancelReservation(r.id)} className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-ub-red px-2.5 py-1 rounded-lg hover:bg-red-50 cursor-pointer">
+                        // Bug 4 fixed: cancelRoomBooking instead of cancelReservation
+                        <button
+                          onClick={() => cancelRoomBooking(r.id)}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-ub-red px-2.5 py-1 rounded-lg hover:bg-red-50 cursor-pointer"
+                        >
                           <X size={12} /> Cancel
                         </button>
-                      ) : <span className="text-xs text-ub-gray">—</span>}
+                      ) : (
+                        <span className="text-xs text-ub-gray">—</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -83,7 +103,11 @@ export default function RoomsTab() {
         onClose={() => setCalendarOpen(false)}
         onNext={(sel) => { setSelection(sel); setCalendarOpen(false); setFormOpen(true); }}
       />
-      <ReservationFormModal open={formOpen} onClose={() => setFormOpen(false)} selection={selection} />
+      <ReservationFormModal
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        selection={selection}
+      />
     </div>
   );
 }
