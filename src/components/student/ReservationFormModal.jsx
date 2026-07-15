@@ -7,7 +7,7 @@ import { formatSlot } from '@/lib/format';
 import toast from 'react-hot-toast';
 
 export default function ReservationFormModal({ open, onClose, selection }) {
-  const { session, addReservation } = useApp();
+  const { session, reservations, addRoomBooking } = useApp();
   const [reason, setReason] = useState('');
   const [photo, setPhoto] = useState('');
   const [error, setError] = useState('');
@@ -17,24 +17,38 @@ export default function ReservationFormModal({ open, onClose, selection }) {
   }, [open, selection]);
 
   if (!selection) return null;
+
   const room = ROOMS.find((r) => r.id === selection.roomId);
   const slotStr = `${selection.dateValue} ${selection.slot}`;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (reason.trim().length < 4) { setError('Please provide a reason (at least 4 characters).'); return; }
     if (!photo) { setError('A student photo is required.'); return; }
-    addReservation({
-      type: 'room',
-      student: session.userId,
-      studentName: session.userName,
-      status: 'pending',
-      date: new Date().toISOString().slice(0, 10),
-      borrowingPurpose: reason.trim(),
-      studentPhoto: photo,
-      detail: `${room?.name || selection.roomId} · ${formatSlot(slotStr)}`,
+
+    // Daily limit guard
+    const today = new Date().toISOString().slice(0, 10);
+    const todayCount = reservations.filter(
+      r => r.type === 'room' &&
+           r.user_id === session.userDbId &&
+           r.date === today &&
+           (r.status === 'pending' || r.status === 'approved')
+    ).length;
+
+    if (todayCount >= 3) {
+      setError('Daily room reservation limit (3) reached.');
+      return;
+    }
+
+    const { error: err } = await addRoomBooking({
       roomId: selection.roomId,
-      roomSlot: slotStr,
+      roomName: room?.name || selection.roomId,
+      date: selection.dateValue,
+      timeSlot: selection.slot,
+      purpose: reason.trim(),
+      photo,
     });
+
+    if (err) { setError('Something went wrong. Please try again.'); return; }
     toast.success('Room reservation submitted!');
     onClose();
   };
@@ -54,7 +68,7 @@ export default function ReservationFormModal({ open, onClose, selection }) {
             <input value={session.userName} disabled className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-gray-600 text-sm" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Student ID</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">ID Number</label>
             <input value={session.userId} disabled className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-gray-600 text-sm" />
           </div>
         </div>
@@ -71,7 +85,7 @@ export default function ReservationFormModal({ open, onClose, selection }) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Student Photo</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Photo</label>
           <PhotoUpload photo={photo} setPhoto={(p) => { setError(''); setPhoto(p); }} />
         </div>
 

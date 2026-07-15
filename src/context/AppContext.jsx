@@ -77,21 +77,50 @@ export function AppProvider({ children }) {
   }, []);
 
   // ── Role detection ───────────────────────────────────────────────────────
-  const detectRole = (email) => /^\d/.test(email.split('@')[0]) ? 'student' : 'admin';
+  // Only emails starting with numbers are students
+  // Faculty and admins both start with letters but declared differently
+  const detectRole = (email, declaredRole) => {
+    const localPart = email.split('@')[0];
+    const startsWithNumber = /^\d/.test(localPart);
+    if (startsWithNumber) return 'student';
+    if (declaredRole === 'faculty') return 'student'; // faculty gets student dashboard
+    return 'admin'; // only explicit admin emails get admin role
+  };
 
   // ── REGISTER ─────────────────────────────────────────────────────────────
-  const register = useCallback(async (email, password, name, studentId) => {
+  const register = useCallback(async (email, password, name, studentId, declaredRole = 'student') => {
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email, password,
       options: { data: { name, student_id: studentId } },
     });
     if (authError) return { success: false, error: authError.message };
 
-    const role = detectRole(email);
+    const role = detectRole(email, declaredRole);
     const { error: dbError } = await supabase.from('users').insert([{
-      id: authData.user.id, name, student_id: studentId, email, password: '', role,
+      id: authData.user.id,
+      name,
+      student_id: studentId,
+      email,
+      password: '',
+      role,
+      declared_role: declaredRole,
+      faculty_verified: declaredRole === 'student',
     }]);
     if (dbError) return { success: false, error: dbError.message };
+
+    // Notify admins if faculty registered
+    if (declaredRole === 'faculty') {
+      await supabase.from('notifications').insert(
+        await supabase.from('users').select('id').eq('role', 'admin')
+          .then(({ data }) => (data || []).map(a => ({
+            user_id: a.id,
+            title: 'New Faculty Registration 👨‍🏫',
+            message: `${name} registered as faculty. Please review their account.`,
+            type: 'pending',
+          })))
+      );
+    }
+
     return { success: true };
   }, []);
 
@@ -114,6 +143,7 @@ export function AppProvider({ children }) {
       userName: userData.name,
       userId: userData.student_id,
       userDbId: userData.id,
+      declaredRole: userData.declared_role || userData.role,
     };
     sessionStorage.setItem('ublib_session', JSON.stringify(newSession));
     setSession(newSession);

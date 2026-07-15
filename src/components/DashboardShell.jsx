@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '@/context/AppContext';
-import { Home, BookOpen, MessageSquare, CreditCard, BarChart3, ClipboardList } from 'lucide-react';
+import { Home, BookOpen, MessageSquare, CreditCard, BarChart3, ClipboardList, Users } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import MobileNavbar from '@/components/MobileNavbar';
 import HomeTab from '@/pages/student/HomeTab';
@@ -11,12 +11,15 @@ import DashboardTab from '@/pages/admin/DashboardTab';
 import RequestsTab from '@/pages/admin/RequestsTab';
 import RoomRequestsTab from '@/pages/admin/RoomRequestsTab';
 import BooksTab from '@/pages/admin/BooksTab';
+import UsersTab from '@/pages/admin/UsersTab';
 import ubLogo from '@/assets/UB_LIPA_LOGO.png';
 import NotificationBell from '@/components/NotificationBell';
 
 export default function DashboardShell() {
   const { session } = useApp();
   const isStudent = session.userType === 'student';
+  const isFaculty = session.declaredRole === 'faculty';
+  const roleLabel = session.userType === 'admin' ? 'Admin' : isFaculty ? 'Faculty' : 'Student';
   const [activeTab, setActiveTab] = useState(isStudent ? 'home' : 'dashboard');
 
   const studentTabs = [
@@ -31,6 +34,7 @@ export default function DashboardShell() {
     { key: 'requests',  label: 'Book Requests',  icon: ClipboardList },
     { key: 'books',     label: 'Catalog',        icon: BookOpen },
     { key: 'rooms',     label: 'Room Requests',  icon: MessageSquare },
+    { key: 'users',     label: 'Users',          icon: Users },
   ];
 
   const tabs = isStudent ? studentTabs : adminTabs;
@@ -50,6 +54,7 @@ export default function DashboardShell() {
       case 'requests':  return <RequestsTab />;
       case 'books':     return <BooksTab />;
       case 'rooms':     return <RoomRequestsTab />;
+      case 'users':     return <UsersTab />;
       default:          return <DashboardTab />;
     }
   };
@@ -79,7 +84,7 @@ export default function DashboardShell() {
             <div className="text-right">
               <p className="text-sm font-semibold text-gray-800 leading-tight">{session.userName}</p>
               <p className="text-[11px] text-gray-400 leading-tight">
-                {session.userId} · {isStudent ? 'Student' : 'Admin'}
+                {session.userId} · {roleLabel}
               </p>
             </div>
             <div className="w-9 h-9 rounded-full bg-ub-red flex items-center justify-center text-white font-bold text-sm shadow-md shadow-ub-red/30">
