@@ -1,13 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AppProvider, useApp } from '@/context/AppContext';
 import { Toaster } from 'react-hot-toast';
 import Login from '@/pages/Login';
 import DashboardShell from '@/components/DashboardShell';
+import LandingPage from '@/pages/LandingPage';
 
 function MainAppInner() {
   const { session } = useApp();
-  if (!session.userType) return <Login />;
-  return <DashboardShell />;
+  const [page, setPage] = useState('landing'); // 'landing' | 'login' | 'register'
+
+  // If logged in, always show dashboard
+  if (session.userType) return <DashboardShell />;
+
+  // Show landing page
+  if (page === 'landing') {
+    return <LandingPage onNavigate={setPage} />;
+  }
+
+  // Show login/register
+  return <Login initialTab={page} onBack={() => setPage('landing')} />;
 }
 
 export default function MainApp() {

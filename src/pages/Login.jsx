@@ -5,10 +5,10 @@ import ubLogo from '@/assets/UB_LIPA_LOGO.png';
 
 const TABS = { login: 'login', register: 'register' };
 
-export default function Login() {
+export default function Login({ initialTab = 'login', onBack }) {
   const { login, register } = useApp();
 
-  const [tab, setTab] = useState(TABS.login);
+  const [tab, setTab] = useState(initialTab);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -88,6 +88,11 @@ export default function Login() {
 
         {/* Logo */}
         <div className="flex flex-col items-center mb-6">
+          {onBack && (
+            <button onClick={onBack} className="self-start mb-4 text-sm text-ub-gray hover:text-ub-red flex items-center gap-1 cursor-pointer">
+              ← Back to Home
+            </button>
+          )}
           <img src={ubLogo} alt="University of Batangas" className="h-20 object-contain mb-3" />
           <h1 className="font-display text-2xl font-bold text-ub-red">UB Library</h1>
           <p className="text-sm text-ub-gray mt-1">Library & Resource Center</p>
