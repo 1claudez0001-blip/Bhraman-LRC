@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '@/context/AppContext';
-import { Home, BookOpen, MessageSquare, CreditCard, BarChart3, ClipboardList, Users } from 'lucide-react';
+import { Home, BookOpen, MessageSquare, CreditCard, BarChart3, ClipboardList, Users, Repeat } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import MobileNavbar from '@/components/MobileNavbar';
 import HomeTab from '@/pages/student/HomeTab';
@@ -15,29 +15,49 @@ import UsersTab from '@/pages/admin/UsersTab';
 import ubLogo from '@/assets/UB_LIPA_LOGO.png';
 import NotificationBell from '@/components/NotificationBell';
 
-export default function DashboardShell() {
+export default function DashboardShell({ saMode, setSaMode }) {
   const { session } = useApp();
-  const isStudent = session.userType === 'student';
+  const isAdmin = session.userType === 'admin';
+  const isSA = session.userType === 'sa';
+  const isSAasStudent = isSA && saMode === 'student';
+  const isSAasAssistant = isSA && saMode === 'sa';
+  const isStudent = session.userType === 'student' || isSAasStudent;
   const isFaculty = session.declaredRole === 'faculty';
-  const roleLabel = session.userType === 'admin' ? 'Admin' : isFaculty ? 'Faculty' : 'Student';
-  const [activeTab, setActiveTab] = useState(isStudent ? 'home' : 'dashboard');
+
+  const roleLabel = isAdmin ? 'Admin'
+    : isSAasAssistant ? 'Student Assistant'
+    : isFaculty ? 'Faculty'
+    : isSA ? 'Student Assistant'
+    : 'Student';
+
+  const [activeTab, setActiveTab] = useState(
+    isStudent ? 'home' : 'dashboard'
+  );
 
   const studentTabs = [
-    { key: 'home',    label: 'Home',         icon: Home },
-    { key: 'catalog', label: 'Catalog',       icon: BookOpen },
-    { key: 'rooms',   label: 'Rooms',         icon: MessageSquare },
-    { key: 'trans',   label: 'Transactions',  icon: CreditCard },
+    { key: 'home',    label: 'Home',        icon: Home },
+    { key: 'catalog', label: 'Catalog',      icon: BookOpen },
+    { key: 'rooms',   label: 'Rooms',        icon: MessageSquare },
+    { key: 'trans',   label: 'Transactions', icon: CreditCard },
+  ];
+
+  // SA gets admin tabs minus Users tab and Export (handled inside DashboardTab)
+  const saTabs = [
+    { key: 'dashboard', label: 'Dashboard',     icon: BarChart3 },
+    { key: 'requests',  label: 'Book Requests', icon: ClipboardList },
+    { key: 'books',     label: 'Catalog',       icon: BookOpen },
+    { key: 'rooms',     label: 'Room Requests', icon: MessageSquare },
   ];
 
   const adminTabs = [
-    { key: 'dashboard', label: 'Dashboard',      icon: BarChart3 },
-    { key: 'requests',  label: 'Book Requests',  icon: ClipboardList },
-    { key: 'books',     label: 'Catalog',        icon: BookOpen },
-    { key: 'rooms',     label: 'Room Requests',  icon: MessageSquare },
-    { key: 'users',     label: 'Users',          icon: Users },
+    { key: 'dashboard', label: 'Dashboard',     icon: BarChart3 },
+    { key: 'requests',  label: 'Book Requests', icon: ClipboardList },
+    { key: 'books',     label: 'Catalog',       icon: BookOpen },
+    { key: 'rooms',     label: 'Room Requests', icon: MessageSquare },
+    { key: 'users',     label: 'Users',         icon: Users },
   ];
 
-  const tabs = isStudent ? studentTabs : adminTabs;
+  const tabs = isStudent ? studentTabs : isAdmin ? adminTabs : saTabs;
 
   const renderContent = () => {
     if (isStudent) {
@@ -50,18 +70,25 @@ export default function DashboardShell() {
       }
     }
     switch (activeTab) {
-      case 'dashboard': return <DashboardTab />;
+      case 'dashboard': return <DashboardTab isSA={isSAasAssistant} />;
       case 'requests':  return <RequestsTab />;
       case 'books':     return <BooksTab />;
       case 'rooms':     return <RoomRequestsTab />;
       case 'users':     return <UsersTab />;
-      default:          return <DashboardTab />;
+      default:          return <DashboardTab isSA={isSAasAssistant} />;
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      <Sidebar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Sidebar
+        tabs={tabs}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        isSA={isSA}
+        saMode={saMode}
+        setSaMode={setSaMode}
+      />
 
       <div className="flex-1 flex flex-col min-w-0">
         <MobileNavbar tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -71,12 +98,8 @@ export default function DashboardShell() {
           <div className="flex items-center gap-3">
             <img src={ubLogo} alt="UB" className="w-8 h-8 object-contain" />
             <div>
-              <p className="text-sm font-bold text-gray-800 leading-tight">
-                University of Batangas
-              </p>
-              <p className="text-[11px] text-gray-400 leading-tight tracking-wide">
-                Library & Resource Center
-              </p>
+              <p className="text-sm font-bold text-gray-800 leading-tight">University of Batangas</p>
+              <p className="text-[11px] text-gray-400 leading-tight tracking-wide">Library & Resource Center</p>
             </div>
           </div>
           <div className="flex items-center gap-3">

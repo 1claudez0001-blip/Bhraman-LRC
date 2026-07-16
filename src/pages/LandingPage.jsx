@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useEffect, useState } from 'react';
 import { BookOpen, MessageSquare, ClipboardList, Star, Users, Clock, ArrowRight } from 'lucide-react';
 import ubLogo from '@/assets/UB_LIPA_LOGO.png';

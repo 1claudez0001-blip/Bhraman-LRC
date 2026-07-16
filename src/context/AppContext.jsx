@@ -7,7 +7,7 @@ export function AppProvider({ children }) {
   const [session, setSession] = useState(() => {
     try {
       const raw = sessionStorage.getItem('ublib_session');
-      return raw ? JSON.parse(raw) : { userType: null, userName: null, userId: null, userDbId: null };
+      return raw ? JSON.parse(raw) : { userType: null, userName: null, userId: null, userDbId: null, declaredRole: null };
     } catch {
       return { userType: null, userName: null, userId: null, userDbId: null };
     }
@@ -139,7 +139,7 @@ export function AppProvider({ children }) {
       return { success: false, error: 'Account not found. Please register first.' };
 
     const newSession = {
-      userType: userData.role,
+      userType: userData.role, // 'student', 'sa', 'admin'
       userName: userData.name,
       userId: userData.student_id,
       userDbId: userData.id,

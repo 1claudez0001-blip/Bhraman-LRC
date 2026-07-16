@@ -4,20 +4,23 @@ import { Toaster } from 'react-hot-toast';
 import Login from '@/pages/Login';
 import DashboardShell from '@/components/DashboardShell';
 import LandingPage from '@/pages/LandingPage';
+import ModePicker from '@/pages/ModePicker';
 
 function MainAppInner() {
   const { session } = useApp();
-  const [page, setPage] = useState('landing'); // 'landing' | 'login' | 'register'
+  const [page, setPage] = useState('landing');
+  const [saMode, setSaMode] = useState(null); // 'student' | 'sa'
 
-  // If logged in, always show dashboard
-  if (session.userType) return <DashboardShell />;
-
-  // Show landing page
-  if (page === 'landing') {
-    return <LandingPage onNavigate={setPage} />;
+  // Logged in
+  if (session.userType) {
+    // SA user needs to pick mode first
+    if (session.userType === 'sa' && !saMode) {
+      return <ModePicker session={session} onPick={setSaMode} />;
+    }
+    return <DashboardShell saMode={saMode} setSaMode={setSaMode} />;
   }
 
-  // Show login/register
+  if (page === 'landing') return <LandingPage onNavigate={setPage} />;
   return <Login initialTab={page} onBack={() => setPage('landing')} />;
 }
 

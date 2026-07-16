@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Search, CheckCircle, XCircle, ShieldCheck, User, GraduationCap, BookOpen } from 'lucide-react';
+import { Search, CheckCircle, XCircle, ShieldCheck, GraduationCap, BookOpen, ClipboardList, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const ROLE_FILTERS = ['all', 'student', 'faculty'];
@@ -9,6 +9,11 @@ function RoleBadge({ role, declaredRole, facultyVerified }) {
   if (role === 'admin') return (
     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700">
       <ShieldCheck size={11} /> Admin
+    </span>
+  );
+  if (role === 'sa') return (
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700">
+      <ClipboardList size={11} /> Student Assistant
     </span>
   );
   if (declaredRole === 'faculty') return (
@@ -104,10 +109,30 @@ export default function UsersTab() {
     fetchUsers();
   };
 
-  const banUser = async (userId, name) => {
-    if (!window.confirm(`Are you sure you want to ban ${name}?`)) return;
-    await supabase.from('users').update({ role: 'banned' }).eq('id', userId);
-    toast.success(`${name} has been banned.`);
+  const promoteToSA = async (userId, name) => {
+    const { error } = await supabase.from('users').update({ role: 'sa' }).eq('id', userId);
+    if (error) { toast.error('Failed to promote.'); return; }
+    await supabase.from('notifications').insert([{
+      user_id: userId,
+      title: 'You are now a Student Assistant! 🎉',
+      message: 'Congratulations! You have been promoted to Student Assistant. Log out and back in to access your new dashboard.',
+      type: 'approved',
+    }]);
+    toast.success(`${name} promoted to Student Assistant!`);
+    fetchUsers();
+  };
+
+  const demoteFromSA = async (userId, name) => {
+    if (!window.confirm(`Remove SA role from ${name}?`)) return;
+    const { error } = await supabase.from('users').update({ role: 'student' }).eq('id', userId);
+    if (error) { toast.error('Failed to demote.'); return; }
+    await supabase.from('notifications').insert([{
+      user_id: userId,
+      title: 'SA Role Removed',
+      message: 'Your Student Assistant role has been removed. You now have standard student access.',
+      type: 'info',
+    }]);
+    toast.success(`${name} demoted to student.`);
     fetchUsers();
   };
 
@@ -196,22 +221,27 @@ export default function UsersTab() {
                       <div className="flex items-center justify-end gap-2">
                         {u.declared_role === 'faculty' && !u.faculty_verified && (
                           <>
-                            <button
-                              onClick={() => approveFaculty(u.id, u.name)}
-                              className="inline-flex items-center gap-1 text-xs font-semibold text-ub-green px-2.5 py-1 rounded-lg hover:bg-green-50 cursor-pointer"
-                            >
+                            <button onClick={() => approveFaculty(u.id, u.name)}
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-ub-green px-2.5 py-1 rounded-lg hover:bg-green-50 cursor-pointer">
                               <CheckCircle size={12} /> Approve
                             </button>
-                            <button
-                              onClick={() => rejectFaculty(u.id, u.name)}
-                              className="inline-flex items-center gap-1 text-xs font-semibold text-red-500 px-2.5 py-1 rounded-lg hover:bg-red-50 cursor-pointer"
-                            >
+                            <button onClick={() => rejectFaculty(u.id, u.name)}
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-red-500 px-2.5 py-1 rounded-lg hover:bg-red-50 cursor-pointer">
                               <XCircle size={12} /> Reject
                             </button>
                           </>
                         )}
-                        {u.role !== 'admin' && u.role !== 'banned' && u.faculty_verified && (
-                          <span className="text-xs text-ub-gray">Active</span>
+                        {u.role === 'student' && u.faculty_verified !== false && (
+                          <button onClick={() => promoteToSA(u.id, u.name)}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 px-2.5 py-1 rounded-lg hover:bg-orange-50 cursor-pointer">
+                            <Star size={12} /> Make SA
+                          </button>
+                        )}
+                        {u.role === 'sa' && (
+                          <button onClick={() => demoteFromSA(u.id, u.name)}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 px-2.5 py-1 rounded-lg hover:bg-gray-100 cursor-pointer">
+                            <XCircle size={12} /> Remove SA
+                          </button>
                         )}
                         {u.role === 'admin' && (
                           <span className="text-xs text-ub-gray">—</span>

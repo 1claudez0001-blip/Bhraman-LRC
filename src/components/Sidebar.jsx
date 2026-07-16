@@ -1,12 +1,12 @@
 import React from 'react';
 import { useApp } from '@/context/AppContext';
-import { LogOut, ExternalLink } from 'lucide-react';
+import { LogOut, ExternalLink, Repeat } from 'lucide-react';
 import { LMS_URL, LRC_URL } from '@/lib/constants';
 import ubLogo from '@/assets/UB_LIPA_LOGO.png';
 
-export default function Sidebar({ tabs, activeTab, setActiveTab }) {
+export default function Sidebar({ tabs, activeTab, setActiveTab, isSA, saMode, setSaMode }) {
   const { session, logout } = useApp();
-  const isStudent = session.userType === 'student';
+  const isStudent = session.userType === 'student' || (isSA && saMode === 'student');
 
   return (
     <aside className="hidden md:flex flex-col w-60 shrink-0 min-h-screen"
@@ -64,6 +64,20 @@ export default function Sidebar({ tabs, activeTab, setActiveTab }) {
       {/* Bottom links */}
       <div className="px-3 pb-5 pt-3 space-y-0.5">
         <div className="w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mb-3" />
+
+        {/* SA mode switcher */}
+        {isSA && setSaMode && (
+          <button
+            onClick={() => setSaMode(saMode === 'student' ? 'sa' : 'student')}
+            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[13px] font-medium text-ub-gold hover:text-white hover:bg-white/8 transition-all duration-200 cursor-pointer group"
+          >
+            <Repeat size={15} className="group-hover:scale-110 transition-transform duration-200" />
+            <span className="tracking-wide">
+              Switch to {saMode === 'student' ? 'Assistant' : 'Student'} Mode
+            </span>
+          </button>
+        )}
+
         <a
           href={LMS_URL}
           target="_blank"
