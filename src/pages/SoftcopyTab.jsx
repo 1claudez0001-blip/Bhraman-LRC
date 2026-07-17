@@ -38,17 +38,22 @@ export default function SoftcopyTab() {
 
   const fetchRequests = async () => {
     setLoading(true);
-    let query = supabase
-      .from('softcopy_requests')
-      .select('*, books(title, author, cover_url), users(name, student_id)')
-      .order('created_at', { ascending: false });
 
-    if (!isStaff) {
-      query = query.eq('user_id', session.userDbId);
+    if (isStaff) {
+      const { data, error } = await supabase
+        .from('softcopy_requests')
+        .select('*, books(title, author, cover_url), users(name, student_id)')
+        .order('created_at', { ascending: false });
+      if (!error && data) setRequests(data);
+    } else {
+      const { data, error } = await supabase
+        .from('softcopy_requests')
+        .select('*, books(title, author, cover_url), users(name, student_id)')
+        .eq('user_id', session.userDbId)
+        .order('created_at', { ascending: false });
+      if (!error && data) setRequests(data);
     }
 
-    const { data } = await query;
-    if (data) setRequests(data);
     setLoading(false);
   };
 
