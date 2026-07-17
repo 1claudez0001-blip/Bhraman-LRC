@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useApp } from '@/context/AppContext';
-import { Home, BookOpen, MessageSquare, CreditCard, BarChart3, ClipboardList, Users, Repeat } from 'lucide-react';
+import { Home, BookOpen, MessageSquare, CreditCard, BarChart3, ClipboardList, Users, Repeat, FileText } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import MobileNavbar from '@/components/MobileNavbar';
 import HomeTab from '@/pages/student/HomeTab';
 import CatalogTab from '@/pages/student/CatalogTab';
 import RoomsTab from '@/pages/student/RoomsTab';
 import TransactionsTab from '@/pages/student/TransactionsTab';
+import SoftcopyTab from '@/pages/SoftcopyTab';
 import DashboardTab from '@/pages/admin/DashboardTab';
 import RequestsTab from '@/pages/admin/RequestsTab';
 import RoomRequestsTab from '@/pages/admin/RoomRequestsTab';
@@ -35,18 +36,19 @@ export default function DashboardShell({ saMode, setSaMode }) {
   );
 
   const studentTabs = [
-    { key: 'home',    label: 'Home',        icon: Home },
-    { key: 'catalog', label: 'Catalog',      icon: BookOpen },
-    { key: 'rooms',   label: 'Rooms',        icon: MessageSquare },
-    { key: 'trans',   label: 'Transactions', icon: CreditCard },
+    { key: 'home',      label: 'Home',        icon: Home },
+    { key: 'catalog',   label: 'Catalog',      icon: BookOpen },
+    { key: 'rooms',     label: 'Rooms',        icon: MessageSquare },
+    { key: 'trans',     label: 'Transactions', icon: CreditCard },
+    { key: 'softcopy',  label: 'Softcopy',     icon: FileText },
   ];
 
-  // SA gets admin tabs minus Users tab and Export (handled inside DashboardTab)
   const saTabs = [
     { key: 'dashboard', label: 'Dashboard',     icon: BarChart3 },
     { key: 'requests',  label: 'Book Requests', icon: ClipboardList },
     { key: 'books',     label: 'Catalog',       icon: BookOpen },
     { key: 'rooms',     label: 'Room Requests', icon: MessageSquare },
+    { key: 'softcopy',  label: 'Softcopy',      icon: FileText },
   ];
 
   const adminTabs = [
@@ -54,6 +56,7 @@ export default function DashboardShell({ saMode, setSaMode }) {
     { key: 'requests',  label: 'Book Requests', icon: ClipboardList },
     { key: 'books',     label: 'Catalog',       icon: BookOpen },
     { key: 'rooms',     label: 'Room Requests', icon: MessageSquare },
+    { key: 'softcopy',  label: 'Softcopy',      icon: FileText },
     { key: 'users',     label: 'Users',         icon: Users },
   ];
 
@@ -62,11 +65,12 @@ export default function DashboardShell({ saMode, setSaMode }) {
   const renderContent = () => {
     if (isStudent) {
       switch (activeTab) {
-        case 'home':    return <HomeTab />;
-        case 'catalog': return <CatalogTab />;
-        case 'rooms':   return <RoomsTab />;
-        case 'trans':   return <TransactionsTab />;
-        default:        return <HomeTab />;
+        case 'home':      return <HomeTab />;
+        case 'catalog':   return <CatalogTab />;
+        case 'rooms':     return <RoomsTab />;
+        case 'trans':     return <TransactionsTab />;
+        case 'softcopy':  return <SoftcopyTab />;
+        default:          return <HomeTab />;
       }
     }
     switch (activeTab) {
@@ -74,6 +78,7 @@ export default function DashboardShell({ saMode, setSaMode }) {
       case 'requests':  return <RequestsTab />;
       case 'books':     return <BooksTab />;
       case 'rooms':     return <RoomRequestsTab />;
+      case 'softcopy':  return <SoftcopyTab />;
       case 'users':     return <UsersTab />;
       default:          return <DashboardTab isSA={isSAasAssistant} />;
     }

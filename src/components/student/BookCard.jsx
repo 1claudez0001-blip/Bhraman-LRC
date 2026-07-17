@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { COLLEGE_LABELS } from '@/lib/constants';
-import { BookMarked, BookOpen, X } from 'lucide-react';
+import { BookMarked, BookOpen, X, FileText } from 'lucide-react';
+import SoftcopyRequestModal from '@/components/student/SoftcopyRequestModal';
 
 // Book Detail Modal
 function BookDetailModal({ book, onClose, onReserve, activeReservation }) {
@@ -77,6 +78,7 @@ function BookDetailModal({ book, onClose, onReserve, activeReservation }) {
 
 export default function BookCard({ book, activeReservation, onReserve, index = 0 }) {
   const [showDetail, setShowDetail] = useState(false);
+  const [showSoftcopy, setShowSoftcopy] = useState(false);
   const disabled = !!activeReservation || book.available_copies === 0;
 
   const availabilityColor = book.available_copies === 0
@@ -142,6 +144,12 @@ export default function BookCard({ book, activeReservation, onReserve, index = 0
               : book.available_copies === 0 ? 'Unavailable' : 'Reserve'
             }
           </button>
+          <button
+            onClick={e => { e.stopPropagation(); setShowSoftcopy(true); }}
+            className="mt-1.5 w-full py-2 rounded-xl text-xs font-semibold text-ub-gray border border-gray-200 hover:border-ub-red hover:text-ub-red transition cursor-pointer flex items-center justify-center gap-1"
+          >
+            <FileText size={11} /> Request Softcopy
+          </button>
         </div>
       </div>
 
@@ -151,6 +159,14 @@ export default function BookCard({ book, activeReservation, onReserve, index = 0
           onClose={() => setShowDetail(false)}
           onReserve={onReserve}
           activeReservation={activeReservation}
+        />
+      )}
+
+      {showSoftcopy && (
+        <SoftcopyRequestModal
+          open={showSoftcopy}
+          onClose={() => setShowSoftcopy(false)}
+          book={book}
         />
       )}
     </>
