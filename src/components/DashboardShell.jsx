@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '@/context/AppContext';
-import { Home, BookOpen, MessageSquare, CreditCard, BarChart3, ClipboardList, Users, Repeat, FileText } from 'lucide-react';
+import { Home, BookOpen, MessageSquare, CreditCard, BarChart3, ClipboardList, Users, FileText } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import MobileNavbar from '@/components/MobileNavbar';
 import HomeTab from '@/pages/student/HomeTab';
@@ -69,7 +69,7 @@ export default function DashboardShell({ saMode, setSaMode }) {
         case 'catalog':   return <CatalogTab />;
         case 'rooms':     return <RoomsTab />;
         case 'trans':     return <TransactionsTab />;
-        case 'softcopy':  return <SoftcopyTab />;
+        case 'softcopy':  return <SoftcopyTab saMode={saMode} />;
         default:          return <HomeTab />;
       }
     }
@@ -78,7 +78,7 @@ export default function DashboardShell({ saMode, setSaMode }) {
       case 'requests':  return <RequestsTab />;
       case 'books':     return <BooksTab />;
       case 'rooms':     return <RoomRequestsTab />;
-      case 'softcopy':  return <SoftcopyTab />;
+      case 'softcopy':  return <SoftcopyTab saMode={saMode} />;
       case 'users':     return <UsersTab />;
       default:          return <DashboardTab isSA={isSAasAssistant} />;
     }

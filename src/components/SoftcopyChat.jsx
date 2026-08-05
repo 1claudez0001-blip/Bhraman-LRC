@@ -31,7 +31,7 @@ function FilePreview({ url, name, type }) {
   );
 }
 
-export default function SoftcopyChat({ request, onClose, onFulfill }) {
+export default function SoftcopyChat({ request, onClose, onFulfill, saMode }) {
   const { session } = useApp();
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
@@ -42,7 +42,10 @@ export default function SoftcopyChat({ request, onClose, onFulfill }) {
   const [minimized, setMinimized] = useState(false);
   const bottomRef = useRef();
   const fileRef = useRef();
-  const isStaff = session.userType === 'admin' || session.userType === 'sa';
+
+  // SA in student mode should behave like a student
+  const isStaff = (session.userType === 'admin') ||
+    (session.userType === 'sa' && saMode === 'sa');
 
   const fetchMessages = async () => {
     const { data } = await supabase
@@ -108,7 +111,6 @@ export default function SoftcopyChat({ request, onClose, onFulfill }) {
 
   const sendMessage = async () => {
     if (!text.trim() && !file) return;
-    // Only staff needs to acknowledge before sending
     if (isStaff && !adminAcknowledged) { setShowAck(true); return; }
 
     setUploading(true);
@@ -152,7 +154,6 @@ export default function SoftcopyChat({ request, onClose, onFulfill }) {
     onClose();
   };
 
-  // Minimized floating bubble
   if (minimized) {
     return (
       <div
@@ -194,7 +195,6 @@ export default function SoftcopyChat({ request, onClose, onFulfill }) {
                 <CheckCircle size={12} /> Mark Fulfilled
               </button>
             )}
-            {/* Minimize button */}
             <button
               onClick={() => setMinimized(true)}
               className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center cursor-pointer"
@@ -234,7 +234,6 @@ export default function SoftcopyChat({ request, onClose, onFulfill }) {
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
-          {/* Request reason */}
           <div className="bg-gray-50 rounded-xl px-4 py-3 text-center">
             <p className="text-xs text-ub-gray">Request reason</p>
             <p className="text-sm text-gray-700 mt-0.5 italic">"{request.reason}"</p>
@@ -287,7 +286,6 @@ export default function SoftcopyChat({ request, onClose, onFulfill }) {
         {/* Input area */}
         {request.status === 'open' && (
           <div className="px-4 py-3 border-t border-gray-100 flex items-center gap-2 shrink-0">
-            {/* File upload only for staff */}
             {isStaff && (
               <>
                 <button onClick={() => fileRef.current?.click()}

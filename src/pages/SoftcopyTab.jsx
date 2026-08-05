@@ -29,12 +29,15 @@ function SkeletonRow() {
   );
 }
 
-export default function SoftcopyTab() {
+export default function SoftcopyTab({ saMode }) {
   const { session } = useApp();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeChat, setActiveChat] = useState(null);
-  const isStaff = session.userType === 'admin' || session.userType === 'sa';
+
+  // SA in student mode should behave like a student
+  const isStaff = (session.userType === 'admin') ||
+    (session.userType === 'sa' && saMode === 'sa');
 
   const fetchRequests = async () => {
     setLoading(true);
@@ -73,9 +76,8 @@ export default function SoftcopyTab() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchRequests(); }, []);
+  useEffect(() => { fetchRequests(); }, [isStaff]);
 
-  // Realtime for new requests
   useEffect(() => {
     const channel = supabase
       .channel('softcopy_requests_changes')
@@ -151,12 +153,21 @@ export default function SoftcopyTab() {
                     <td className="px-5 py-3 text-ub-gray">{formatDate(r.created_at)}</td>
                     <td className="px-5 py-3"><StatusBadge status={r.status} /></td>
                     <td className="px-5 py-3 text-right">
-                      <button
-                        onClick={() => setActiveChat(r)}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-ub-red px-2.5 py-1.5 rounded-lg hover:bg-red-50 cursor-pointer"
-                      >
-                        <MessageSquare size={12} /> Open Chat
-                      </button>
+                      {r.status === 'open' ? (
+                        <button
+                          onClick={() => setActiveChat(r)}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-ub-red px-2.5 py-1.5 rounded-lg hover:bg-red-50 cursor-pointer"
+                        >
+                          <MessageSquare size={12} /> Open Chat
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setActiveChat(r)}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-ub-gray px-2.5 py-1.5 rounded-lg hover:bg-gray-100 cursor-pointer"
+                        >
+                          <MessageSquare size={12} /> View Chat
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -171,6 +182,7 @@ export default function SoftcopyTab() {
           request={activeChat}
           onClose={() => setActiveChat(null)}
           onFulfill={fetchRequests}
+          saMode={saMode}
         />
       )}
     </div>
