@@ -39,19 +39,35 @@ export default function SoftcopyTab() {
   const fetchRequests = async () => {
     setLoading(true);
 
-    if (isStaff) {
-      const { data, error } = await supabase
-        .from('softcopy_requests')
-        .select('*, books(title, author, cover_url), users(name, student_id)')
-        .order('created_at', { ascending: false });
-      if (!error && data) setRequests(data);
-    } else {
-      const { data, error } = await supabase
-        .from('softcopy_requests')
-        .select('*, books(title, author, cover_url), users(name, student_id)')
-        .eq('user_id', session.userDbId)
-        .order('created_at', { ascending: false });
-      if (!error && data) setRequests(data);
+    let query = supabase
+      .from('softcopy_requests')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!isStaff) {
+      query = query.eq('user_id', session.userDbId);
+    }
+
+    const { data, error } = await query;
+
+    if (!error && data && data.length > 0) {
+      const bookIds = [...new Set(data.map(r => r.book_id))];
+      const userIds = [...new Set(data.map(r => r.user_id))];
+
+      const [{ data: books }, { data: users }] = await Promise.all([
+        supabase.from('books').select('id, title, author, cover_url').in('id', bookIds),
+        supabase.from('users').select('id, name, student_id').in('id', userIds),
+      ]);
+
+      const enriched = data.map(r => ({
+        ...r,
+        books: books?.find(b => b.id === r.book_id) || null,
+        users: users?.find(u => u.id === r.user_id) || null,
+      }));
+
+      setRequests(enriched);
+    } else if (!error) {
+      setRequests([]);
     }
 
     setLoading(false);
