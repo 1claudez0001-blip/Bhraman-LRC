@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useApp } from '@/context/AppContext';
-import { Send, Paperclip, X, Download, FileText, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Send, Paperclip, X, Download, FileText, AlertTriangle, CheckCircle, Minus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import toast from 'react-hot-toast';
 
@@ -39,6 +39,7 @@ export default function SoftcopyChat({ request, onClose, onFulfill }) {
   const [uploading, setUploading] = useState(false);
   const [adminAcknowledged, setAdminAcknowledged] = useState(request?.admin_acknowledged || false);
   const [showAck, setShowAck] = useState(false);
+  const [minimized, setMinimized] = useState(false);
   const bottomRef = useRef();
   const fileRef = useRef();
   const isStaff = session.userType === 'admin' || session.userType === 'sa';
@@ -46,10 +47,25 @@ export default function SoftcopyChat({ request, onClose, onFulfill }) {
   const fetchMessages = async () => {
     const { data } = await supabase
       .from('softcopy_messages')
-      .select('*, users(name, role)')
+      .select('*')
       .eq('request_id', request.id)
       .order('created_at', { ascending: true });
-    if (data) setMessages(data);
+
+    if (data && data.length > 0) {
+      const senderIds = [...new Set(data.map(m => m.sender_id))];
+      const { data: users } = await supabase
+        .from('users')
+        .select('id, name, role')
+        .in('id', senderIds);
+
+      const enriched = data.map(m => ({
+        ...m,
+        users: users?.find(u => u.id === m.sender_id) || null,
+      }));
+      setMessages(enriched);
+    } else {
+      setMessages([]);
+    }
   };
 
   useEffect(() => {
@@ -67,8 +83,10 @@ export default function SoftcopyChat({ request, onClose, onFulfill }) {
   }, [request.id]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (!minimized) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, minimized]);
 
   const handleFileChange = (e) => {
     const f = e.target.files[0];
@@ -90,6 +108,7 @@ export default function SoftcopyChat({ request, onClose, onFulfill }) {
 
   const sendMessage = async () => {
     if (!text.trim() && !file) return;
+    // Only staff needs to acknowledge before sending
     if (isStaff && !adminAcknowledged) { setShowAck(true); return; }
 
     setUploading(true);
@@ -133,16 +152,39 @@ export default function SoftcopyChat({ request, onClose, onFulfill }) {
     onClose();
   };
 
+  // Minimized floating bubble
+  if (minimized) {
+    return (
+      <div
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-ub-red text-white px-4 py-3 rounded-2xl shadow-2xl cursor-pointer hover:bg-ub-darkRed transition"
+        onClick={() => setMinimized(false)}
+      >
+        <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+        <div>
+          <p className="text-xs font-semibold leading-tight">{request.books?.title}</p>
+          <p className="text-[10px] opacity-70">Softcopy Chat · tap to open</p>
+        </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); onClose(); }}
+          className="ml-1 opacity-70 hover:opacity-100"
+        >
+          <X size={14} />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col animate-scale-in overflow-hidden"
-        style={{ maxHeight: '85vh' }}>
-
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setMinimized(true)} />
+      <div
+        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col animate-scale-in overflow-hidden"
+        style={{ height: '80vh' }}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
           <div>
-            <p className="font-semibold text-gray-900 text-sm">{request.books?.title}</p>
+            <p className="font-semibold text-gray-900">{request.books?.title}</p>
             <p className="text-xs text-ub-gray">Softcopy Request · {request.users?.name}</p>
           </div>
           <div className="flex items-center gap-2">
@@ -152,6 +194,14 @@ export default function SoftcopyChat({ request, onClose, onFulfill }) {
                 <CheckCircle size={12} /> Mark Fulfilled
               </button>
             )}
+            {/* Minimize button */}
+            <button
+              onClick={() => setMinimized(true)}
+              className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center cursor-pointer"
+              title="Minimize"
+            >
+              <Minus size={16} />
+            </button>
             <button onClick={onClose}
               className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center cursor-pointer">
               <X size={16} />
@@ -159,9 +209,9 @@ export default function SoftcopyChat({ request, onClose, onFulfill }) {
           </div>
         </div>
 
-        {/* Acknowledgement banner */}
-        {showAck && (
-          <div className="mx-4 mt-3 bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+        {/* Acknowledgement banner — only for staff */}
+        {showAck && isStaff && (
+          <div className="mx-4 mt-3 bg-yellow-50 border border-yellow-200 rounded-xl p-4 shrink-0">
             <div className="flex items-start gap-2 mb-2">
               <AlertTriangle size={15} className="text-yellow-600 shrink-0 mt-0.5" />
               <p className="text-xs font-semibold text-yellow-800">Copyright Acknowledgement Required</p>
@@ -183,7 +233,7 @@ export default function SoftcopyChat({ request, onClose, onFulfill }) {
         )}
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
           {/* Request reason */}
           <div className="bg-gray-50 rounded-xl px-4 py-3 text-center">
             <p className="text-xs text-ub-gray">Request reason</p>
@@ -200,7 +250,7 @@ export default function SoftcopyChat({ request, onClose, onFulfill }) {
             const isStaffMsg = m.users?.role === 'admin' || m.users?.role === 'sa';
             return (
               <div key={m.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm
+                <div className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-sm
                   ${isMe
                     ? 'bg-ub-red text-white rounded-tr-sm'
                     : 'bg-gray-100 text-gray-900 rounded-tl-sm'
@@ -222,9 +272,9 @@ export default function SoftcopyChat({ request, onClose, onFulfill }) {
           <div ref={bottomRef} />
         </div>
 
-        {/* File preview */}
+        {/* File preview bar */}
         {file && (
-          <div className="mx-4 mb-2 flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
+          <div className="mx-4 mb-2 flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2 shrink-0">
             <FileText size={14} className="text-ub-gray shrink-0" />
             <span className="text-xs text-gray-700 truncate flex-1">{file.name}</span>
             <button onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ''; }}
@@ -234,14 +284,19 @@ export default function SoftcopyChat({ request, onClose, onFulfill }) {
           </div>
         )}
 
-        {/* Input */}
+        {/* Input area */}
         {request.status === 'open' && (
-          <div className="px-4 py-3 border-t border-gray-100 flex items-center gap-2">
-            <button onClick={() => fileRef.current?.click()}
-              className="w-9 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center cursor-pointer shrink-0">
-              <Paperclip size={16} className="text-ub-gray" />
-            </button>
-            <input ref={fileRef} type="file" accept={ALLOWED_TYPES.join(',')} onChange={handleFileChange} className="hidden" />
+          <div className="px-4 py-3 border-t border-gray-100 flex items-center gap-2 shrink-0">
+            {/* File upload only for staff */}
+            {isStaff && (
+              <>
+                <button onClick={() => fileRef.current?.click()}
+                  className="w-9 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center cursor-pointer shrink-0">
+                  <Paperclip size={16} className="text-ub-gray" />
+                </button>
+                <input ref={fileRef} type="file" accept={ALLOWED_TYPES.join(',')} onChange={handleFileChange} className="hidden" />
+              </>
+            )}
             <input
               value={text}
               onChange={e => setText(e.target.value)}
@@ -263,7 +318,7 @@ export default function SoftcopyChat({ request, onClose, onFulfill }) {
         )}
 
         {request.status === 'fulfilled' && (
-          <div className="px-4 py-3 border-t border-gray-100 text-center">
+          <div className="px-4 py-3 border-t border-gray-100 text-center shrink-0">
             <p className="text-xs text-ub-green font-semibold flex items-center justify-center gap-1">
               <CheckCircle size={12} /> This request has been fulfilled
             </p>
