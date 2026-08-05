@@ -11,7 +11,7 @@ const ALLOWED_TYPES = [
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ];
-const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_SIZE = 10 * 1024 * 1024;
 
 function FilePreview({ url, name, type }) {
   const isImage = type?.startsWith('image/');
@@ -43,9 +43,19 @@ export default function SoftcopyChat({ request, onClose, onFulfill, saMode }) {
   const bottomRef = useRef();
   const fileRef = useRef();
 
-  // SA in student mode should behave like a student
   const isStaff = (session.userType === 'admin') ||
     (session.userType === 'sa' && saMode === 'sa');
+
+  // Mark all unread messages as read when chat opens
+  const markMessagesRead = async () => {
+    const readColumn = isStaff ? 'read_by_staff' : 'read_by_student';
+    await supabase
+      .from('softcopy_messages')
+      .update({ [readColumn]: true })
+      .eq('request_id', request.id)
+      .eq(readColumn, false)
+      .neq('sender_id', session.userDbId);
+  };
 
   const fetchMessages = async () => {
     const { data } = await supabase
@@ -69,6 +79,9 @@ export default function SoftcopyChat({ request, onClose, onFulfill, saMode }) {
     } else {
       setMessages([]);
     }
+
+    // Mark as read every time messages are fetched while chat is open
+    await markMessagesRead();
   };
 
   useEffect(() => {
@@ -123,6 +136,9 @@ export default function SoftcopyChat({ request, onClose, onFulfill, saMode }) {
         file_url: url,
         file_name: name,
         file_type: type,
+        // Sender's own side is always read; other side starts unread
+        read_by_student: isStaff ? false : true,
+        read_by_staff: isStaff ? true : false,
       }]);
       setText('');
       setFile(null);

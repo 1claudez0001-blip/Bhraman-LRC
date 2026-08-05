@@ -32,10 +32,10 @@ function SkeletonRow() {
 export default function SoftcopyTab({ saMode }) {
   const { session } = useApp();
   const [requests, setRequests] = useState([]);
+  const [unreadCounts, setUnreadCounts] = useState({});
   const [loading, setLoading] = useState(true);
   const [activeChat, setActiveChat] = useState(null);
 
-  // SA in student mode should behave like a student
   const isStaff = (session.userType === 'admin') ||
     (session.userType === 'sa' && saMode === 'sa');
 
@@ -69,11 +69,37 @@ export default function SoftcopyTab({ saMode }) {
       }));
 
       setRequests(enriched);
+
+      // Fetch unread counts for all requests
+      await fetchUnreadCounts(data.map(r => r.id));
     } else if (!error) {
       setRequests([]);
     }
 
     setLoading(false);
+  };
+
+  const fetchUnreadCounts = async (requestIds) => {
+    if (!requestIds.length) return;
+
+    // For staff: count messages where read_by_staff = false and sender is NOT staff
+    // For student: count messages where read_by_student = false and sender is NOT this student
+    const readColumn = isStaff ? 'read_by_staff' : 'read_by_student';
+
+    const { data } = await supabase
+      .from('softcopy_messages')
+      .select('request_id')
+      .in('request_id', requestIds)
+      .eq(readColumn, false)
+      .neq('sender_id', session.userDbId);
+
+    if (data) {
+      const counts = {};
+      data.forEach(m => {
+        counts[m.request_id] = (counts[m.request_id] || 0) + 1;
+      });
+      setUnreadCounts(counts);
+    }
   };
 
   useEffect(() => { fetchRequests(); }, [isStaff]);
@@ -82,11 +108,20 @@ export default function SoftcopyTab({ saMode }) {
     const channel = supabase
       .channel('softcopy_requests_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'softcopy_requests' }, fetchRequests)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'softcopy_messages' }, () => {
+        if (requests.length > 0) fetchUnreadCounts(requests.map(r => r.id));
+      })
       .subscribe();
     return () => supabase.removeChannel(channel);
-  }, []);
+  }, [requests]);
 
   const openRequests = requests.filter(r => r.status === 'open').length;
+
+  const handleOpenChat = (r) => {
+    setActiveChat(r);
+    // Optimistically clear unread count for this request
+    setUnreadCounts(prev => ({ ...prev, [r.id]: 0 }));
+  };
 
   return (
     <div className="space-y-5">
@@ -127,50 +162,54 @@ export default function SoftcopyTab({ saMode }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {requests.map(r => (
-                  <tr key={r.id} className="hover:bg-gray-50/60">
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-3">
-                        {r.books?.cover_url ? (
-                          <img src={r.books.cover_url} alt={r.books.title} className="w-8 h-10 object-cover rounded" />
-                        ) : (
-                          <div className="w-8 h-10 bg-gray-100 rounded flex items-center justify-center">
-                            <FileText size={14} className="text-gray-400" />
-                          </div>
-                        )}
-                        <div>
-                          <p className="font-semibold text-gray-900">{r.books?.title}</p>
-                          <p className="text-xs text-ub-gray">{r.books?.author}</p>
-                        </div>
-                      </div>
-                    </td>
-                    {isStaff && (
+                {requests.map(r => {
+                  const unread = unreadCounts[r.id] || 0;
+                  return (
+                    <tr key={r.id} className="hover:bg-gray-50/60">
                       <td className="px-5 py-3">
-                        <p className="font-medium text-gray-900">{r.users?.name}</p>
-                        <p className="text-xs text-ub-gray">{r.users?.student_id}</p>
+                        <div className="flex items-center gap-3">
+                          {r.books?.cover_url ? (
+                            <img src={r.books.cover_url} alt={r.books.title} className="w-8 h-10 object-cover rounded" />
+                          ) : (
+                            <div className="w-8 h-10 bg-gray-100 rounded flex items-center justify-center">
+                              <FileText size={14} className="text-gray-400" />
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-semibold text-gray-900">{r.books?.title}</p>
+                            <p className="text-xs text-ub-gray">{r.books?.author}</p>
+                          </div>
+                        </div>
                       </td>
-                    )}
-                    <td className="px-5 py-3 text-ub-gray">{formatDate(r.created_at)}</td>
-                    <td className="px-5 py-3"><StatusBadge status={r.status} /></td>
-                    <td className="px-5 py-3 text-right">
-                      {r.status === 'open' ? (
-                        <button
-                          onClick={() => setActiveChat(r)}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-ub-red px-2.5 py-1.5 rounded-lg hover:bg-red-50 cursor-pointer"
-                        >
-                          <MessageSquare size={12} /> Open Chat
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => setActiveChat(r)}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-ub-gray px-2.5 py-1.5 rounded-lg hover:bg-gray-100 cursor-pointer"
-                        >
-                          <MessageSquare size={12} /> View Chat
-                        </button>
+                      {isStaff && (
+                        <td className="px-5 py-3">
+                          <p className="font-medium text-gray-900">{r.users?.name}</p>
+                          <p className="text-xs text-ub-gray">{r.users?.student_id}</p>
+                        </td>
                       )}
-                    </td>
-                  </tr>
-                ))}
+                      <td className="px-5 py-3 text-ub-gray">{formatDate(r.created_at)}</td>
+                      <td className="px-5 py-3"><StatusBadge status={r.status} /></td>
+                      <td className="px-5 py-3 text-right">
+                        <button
+                          onClick={() => handleOpenChat(r)}
+                          className={`relative inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg cursor-pointer transition
+                            ${r.status === 'open'
+                              ? 'text-ub-red hover:bg-red-50'
+                              : 'text-ub-gray hover:bg-gray-100'
+                            }`}
+                        >
+                          <MessageSquare size={12} />
+                          {r.status === 'open' ? 'Open Chat' : 'View Chat'}
+                          {unread > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-ub-red text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow">
+                              {unread > 9 ? '9+' : unread}
+                            </span>
+                          )}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -180,7 +219,7 @@ export default function SoftcopyTab({ saMode }) {
       {activeChat && (
         <SoftcopyChat
           request={activeChat}
-          onClose={() => setActiveChat(null)}
+          onClose={() => { setActiveChat(null); fetchRequests(); }}
           onFulfill={fetchRequests}
           saMode={saMode}
         />
