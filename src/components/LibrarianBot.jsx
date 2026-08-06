@@ -4,6 +4,15 @@ import { Sparkles, X, Send, Minus, BookOpen, ExternalLink } from 'lucide-react';
 
 const GOOGLE_BOOKS_KEY = import.meta.env.VITE_GOOGLE_BOOKS_API_KEY;
 
+async function callClaude(body) {
+  const res = await fetch('/api/claude', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return res.json();
+}
+
 function EbookCard({ book }) {
   const info = book.volumeInfo;
   const link = info.previewLink || info.infoLink;
@@ -77,40 +86,32 @@ export default function LibrarianBot() {
         content: m.text,
       }));
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1000,
-          system: `You are a friendly, helpful AI Librarian for University of Batangas Lipa Campus Library & Resource Center. 
+      const data = await callClaude({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        system: `You are a friendly, helpful AI Librarian for University of Batangas Lipa Campus Library & Resource Center.
 You help students find books to read. Be warm, concise, and enthusiastic about reading.
-Keep responses short (2-4 sentences max). 
+Keep responses short (2-4 sentences max).
 
 Available books in the library:
 ${bookList}
 
-When recommending, mention specific titles from the library when relevant. 
+When recommending, mention specific titles from the library when relevant.
 Also suggest an ebook search keyword (1-3 words) by ending your response with: [SEARCH: keyword]
 If the question isn't about books, gently redirect to library topics.`,
-          messages: [
-            ...history,
-            { role: 'user', content: userMsg }
-          ]
-        })
+        messages: [
+          ...history,
+          { role: 'user', content: userMsg }
+        ]
       });
 
-      const data = await response.json();
       let text = data.content?.[0]?.text || "I'm not sure about that. Try asking me about books!";
 
-      // Extract search keyword
       const searchMatch = text.match(/\[SEARCH:\s*(.+?)\]/);
       const searchKeyword = searchMatch ? searchMatch[1].trim() : userMsg;
       text = text.replace(/\[SEARCH:\s*.+?\]/, '').trim();
 
-      // Fetch ebooks in parallel
       const ebooks = await searchEbooks(searchKeyword);
-
       setMessages(prev => [...prev, { role: 'assistant', text, ebooks }]);
     } catch {
       setMessages(prev => [...prev, {
@@ -123,12 +124,11 @@ If the question isn't about books, gently redirect to library topics.`,
     }
   };
 
-  // Minimized bubble
   if (!open) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-20 left-4 md:bottom-6 md:left-6 z-40 w-14 h-14 rounded-full bg-ub-red text-white shadow-xl shadow-ub-red/40 flex items-center justify-center hover:bg-ub-darkRed transition hover:scale-110 cursor-pointer"
+        className="fixed bottom-20 right-20 md:bottom-6 md:right-24 z-40 w-14 h-14 rounded-full bg-ub-red text-white shadow-xl shadow-ub-red/40 flex items-center justify-center hover:bg-ub-darkRed transition hover:scale-110 cursor-pointer"
         title="Ask AI Librarian"
       >
         <Sparkles size={22} />
@@ -140,7 +140,7 @@ If the question isn't about books, gently redirect to library topics.`,
     return (
       <div
         onClick={() => setMinimized(false)}
-        className="fixed bottom-20 left-4 md:bottom-6 md:left-6 z-40 flex items-center gap-3 bg-ub-red text-white px-4 py-3 rounded-2xl shadow-2xl cursor-pointer hover:bg-ub-darkRed transition"
+        className="fixed bottom-20 right-20 md:bottom-6 md:right-24 z-40 flex items-center gap-3 bg-ub-red text-white px-4 py-3 rounded-2xl shadow-2xl cursor-pointer hover:bg-ub-darkRed transition"
       >
         <Sparkles size={16} className="animate-pulse" />
         <div>
@@ -156,7 +156,7 @@ If the question isn't about books, gently redirect to library topics.`,
   }
 
   return (
-    <div className="fixed bottom-20 left-4 md:bottom-6 md:left-6 z-40 w-[calc(100vw-2rem)] max-w-sm flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden"
+    <div className="fixed bottom-20 right-4 md:bottom-6 md:right-24 z-40 w-[calc(100vw-2rem)] max-w-sm flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden"
       style={{ height: '70vh', maxHeight: '520px' }}>
 
       {/* Header */}
@@ -187,7 +187,7 @@ If the question isn't about books, gently redirect to library topics.`,
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] space-y-2`}>
+            <div className="max-w-[85%] space-y-2">
               <div className={`rounded-2xl px-3.5 py-2.5 text-sm leading-snug
                 ${m.role === 'user'
                   ? 'bg-ub-red text-white rounded-tr-sm'
@@ -195,7 +195,6 @@ If the question isn't about books, gently redirect to library topics.`,
                 }`}>
                 {m.text}
               </div>
-              {/* Ebook results */}
               {m.ebooks?.length > 0 && (
                 <div className="space-y-1.5">
                   <p className="text-[10px] text-ub-gray font-semibold px-1 flex items-center gap-1">

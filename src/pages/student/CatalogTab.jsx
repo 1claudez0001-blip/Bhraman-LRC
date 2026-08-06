@@ -21,6 +21,15 @@ function useScrollReveal() {
   });
 }
 
+async function callClaude(body) {
+  const res = await fetch('/api/claude', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return res.json();
+}
+
 export default function CatalogTab() {
   const { books, reservations, session, loading } = useApp();
   const [filters, setFilters] = useState([]);
@@ -34,7 +43,6 @@ export default function CatalogTab() {
 
   useScrollReveal();
 
-  // Normal filter
   const normalFiltered = useMemo(() => books.filter((b) => {
     const collegeOk = filters.length === 0 || filters.includes(b.college);
     const q = search.trim().toLowerCase();
@@ -52,7 +60,6 @@ export default function CatalogTab() {
       (r.status === 'pending' || r.status === 'approved')
   );
 
-  // AI search with debounce
   const runAiSearch = async (query) => {
     if (!query.trim() || !aiMode) return;
     setAiLoading(true);
@@ -61,15 +68,12 @@ export default function CatalogTab() {
     try {
       const bookList = books.map(b => `ID:${b.id} | "${b.title}" by ${b.author} | College: ${b.college}`).join('\n');
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1000,
-          messages: [{
-            role: 'user',
-            content: `You are a helpful library assistant for University of Batangas Lipa Campus LRC.
+      const data = await callClaude({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: `You are a helpful library assistant for University of Batangas Lipa Campus LRC.
 
 Here are the available books in our library:
 ${bookList}
@@ -83,11 +87,9 @@ Respond ONLY with valid JSON in this exact format, nothing else:
 }
 
 If no books match, return matchedIds as empty array [] and explain briefly in message.`
-          }]
-        })
+        }]
       });
 
-      const data = await response.json();
       const text = data.content?.[0]?.text || '{}';
       const clean = text.replace(/```json|```/g, '').trim();
       const parsed = JSON.parse(clean);
@@ -106,22 +108,10 @@ If no books match, return matchedIds as empty array [] and explain briefly in me
   const handleSearchChange = (e) => {
     const val = e.target.value;
     setSearch(val);
-
     if (!aiMode) return;
-
-    // Clear previous debounce
     if (debounceRef.current) clearTimeout(debounceRef.current);
-
-    if (!val.trim()) {
-      setAiFiltered(null);
-      setAiMessage('');
-      return;
-    }
-
-    // Debounce AI call by 800ms
-    debounceRef.current = setTimeout(() => {
-      runAiSearch(val);
-    }, 800);
+    if (!val.trim()) { setAiFiltered(null); setAiMessage(''); return; }
+    debounceRef.current = setTimeout(() => runAiSearch(val), 800);
   };
 
   const toggleAiMode = () => {
@@ -146,7 +136,6 @@ If no books match, return matchedIds as empty array [] and explain briefly in me
 
       <FilterPills filters={filters} setFilters={setFilters} />
 
-      {/* Search bar */}
       <div className="space-y-2">
         <div className="relative flex items-center gap-2">
           <div className="relative flex-1">
@@ -165,7 +154,7 @@ If no books match, return matchedIds as empty array [] and explain briefly in me
               placeholder={aiMode ? 'Describe what you want to read…' : 'Search by title or author…'}
               className={`w-full pl-11 pr-10 py-2.5 rounded-xl border bg-white outline-none transition
                 ${aiMode
-                  ? 'border-ub-red ring-2 ring-ub-red/20 focus:border-ub-red'
+                  ? 'border-ub-red ring-2 ring-ub-red/20'
                   : 'border-gray-200 focus:border-ub-red focus:ring-2 focus:ring-ub-red/20'
                 }`}
             />
@@ -175,30 +164,23 @@ If no books match, return matchedIds as empty array [] and explain briefly in me
               </button>
             )}
           </div>
-
-          {/* AI toggle button */}
           <button
             onClick={toggleAiMode}
-            title={aiMode ? 'Switch to normal search' : 'Switch to AI search'}
             className={`shrink-0 flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer
-              ${aiMode
-                ? 'bg-ub-red text-white shadow-md shadow-ub-red/30'
-                : 'bg-gray-100 text-ub-gray hover:bg-gray-200'
-              }`}
+              ${aiMode ? 'bg-ub-red text-white shadow-md shadow-ub-red/30' : 'bg-gray-100 text-ub-gray hover:bg-gray-200'}`}
           >
             <Sparkles size={14} />
             {aiMode ? 'AI On' : 'AI'}
           </button>
         </div>
 
-        {/* AI mode hint / result message */}
         {aiMode && !search && (
           <p className="text-xs text-ub-red flex items-center gap-1.5 px-1">
             <Sparkles size={11} /> Try: "something about Philippine history" or "a short love story"
           </p>
         )}
         {aiMessage && (
-          <p className="text-xs text-ub-gray flex items-center gap-1.5 px-1 bg-gray-50 rounded-lg py-2 px-3">
+          <p className="text-xs text-ub-gray flex items-center gap-1.5 bg-gray-50 rounded-lg py-2 px-3">
             <Sparkles size={11} className="text-ub-red shrink-0" /> {aiMessage}
           </p>
         )}
