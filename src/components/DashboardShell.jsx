@@ -1,3 +1,4 @@
+import LibrarianBot from '@/components/LibrarianBot';
 import React, { useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Home, BookOpen, MessageSquare, CreditCard, BarChart3, ClipboardList, Users, FileText } from 'lucide-react';
@@ -124,6 +125,7 @@ export default function DashboardShell({ saMode, setSaMode }) {
         <main className="flex-1 p-4 md:p-8 max-w-6xl w-full mx-auto animate-slide-up">
           {renderContent()}
         </main>
+        <LibrarianBot />
       </div>
     </div>
   );
